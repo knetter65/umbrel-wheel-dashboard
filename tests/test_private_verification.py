@@ -96,7 +96,7 @@ class PrivateVerificationScannerTests(unittest.TestCase):
     def test_sanitized_scanner_returns_category_not_secret(self):
         secret = b"access_" + b"token" + b"=" + b"abcdefghijklmnop"
         findings = verify.scan_bytes(secret)
-        self.assertEqual(findings, {"credential_value"})
+        self.assertEqual(findings, {"credential_assignment"})
         self.assertNotIn(secret.decode(), json.dumps(sorted(findings)))
 
     def test_cross_origin_redirect_strips_authorization(self):
@@ -197,11 +197,14 @@ class PrivateVerificationScannerTests(unittest.TestCase):
 
     def test_layer_policy_failure_never_contains_match(self):
         secret = b"pass" + b"word" + b"=" + b"abcdefghijklmnop"
-        layer = self.make_layer([("tmp/value", secret)])
+        layer = self.make_layer([("app/src/app.py", secret)])
         with self.assertRaises(verify.VerificationError) as caught:
             verify.scan_layer(layer, verify.sha256_bytes(layer), {})
         self.assertEqual(caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
         self.assertNotIn(secret.decode(), str(caught.exception))
+        os_layer = self.make_layer([("usr/share/doc/example.txt", secret)])
+        os_result = verify.scan_layer(os_layer, verify.sha256_bytes(os_layer), {})
+        self.assertEqual(os_result["regular_files"], 1)
 
     def test_dependency_write_route_is_not_treated_as_application_capability(self):
         payload = b"@app.route('/_dash-update-component', methods=['POST'])"
