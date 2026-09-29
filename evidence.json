@@ -1,1 +1,1 @@
-{"commit":"7c7521be99fa1cfeaff2262e85dc01305d0e1ac3","failure_code":"REPOSITORY_NOT_PRIVATE","repository":"knetter65/umbrel-wheel-dashboard","result":"FAIL","run_id":"36589305986","sanitized":true,"schema":1}
+{"commit":"df374dc1125524f52655f0ebf4a684ec3fc3e837","failure_code":"PACKAGE_REPOSITORY_MISMATCH","repository":"knetter65/umbrel-wheel-dashboard","result":"FAIL","run_id":"36590147107","sanitized":true,"schema":1}
