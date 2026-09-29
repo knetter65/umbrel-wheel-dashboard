@@ -3,6 +3,15 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "umbrel" / "wheel-dashboard"
+STORE_ROOT_PACKAGE = ROOT / "wheel-dashboard"
+STORE_DESCRIPTOR = ROOT / "umbrel-app-store.yml"
+NESTED_STORE_DESCRIPTOR = ROOT / "umbrel" / "umbrel-app-store.yml"
+STORE_PACKAGE_FILES = (
+    "docker-compose.yml",
+    "umbrel-app.yml",
+    "icon.png",
+    "gallery/1.png",
+)
 
 class UmbrelPackageTests(unittest.TestCase):
     def test_identity_and_assets(self):
@@ -12,6 +21,19 @@ class UmbrelPackageTests(unittest.TestCase):
         for path in (PACKAGE / "icon.png", PACKAGE / "gallery" / "1.png"):
             self.assertTrue(path.is_file())
             self.assertGreater(path.stat().st_size, 1000)
+
+    def test_community_store_root_layout_matches_nested_package(self):
+        self.assertTrue(STORE_DESCRIPTOR.is_file())
+        self.assertEqual(STORE_DESCRIPTOR.read_bytes(), NESTED_STORE_DESCRIPTOR.read_bytes())
+        store = STORE_DESCRIPTOR.read_text()
+        self.assertIn("id: wheel", store)
+        self.assertIn("name: Wheel Dashboard Community App Store", store)
+        self.assertTrue((STORE_ROOT_PACKAGE / "umbrel-app.yml").is_file())
+        for relative in STORE_PACKAGE_FILES:
+            nested = PACKAGE / relative
+            root_copy = STORE_ROOT_PACKAGE / relative
+            self.assertTrue(root_copy.is_file(), relative)
+            self.assertEqual(nested.read_bytes(), root_copy.read_bytes(), relative)
 
     def test_hardened_authenticated_proxy(self):
         compose = (PACKAGE / "docker-compose.yml").read_text()

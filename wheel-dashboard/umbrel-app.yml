@@ -1,0 +1,29 @@
+manifestVersion: 1.1
+id: wheel-dashboard
+storage:
+  dataRoot: data
+category: finance
+name: Wheel Dashboard
+version: "0.3.0"
+tagline: Private read-only Wheel strategy analysis
+description: >-
+  A local and read-only dashboard for sanitized Wheel-strategy snapshots. It has
+  no broker connection, order capability, credentials, or unauthenticated host port.
+developer: Wheel Dashboard contributors
+website: ""
+dependencies: []
+repo: ""
+support: ""
+port: 8050
+icon: icon.png
+gallery:
+  - gallery/1.png
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+torOnly: false
+releaseNotes: >-
+  Initial generic package with authenticated Umbrel app-proxy ingress, read-only
+  external data, synthetic fixtures, health checking, and no broker write path.
+submitter: Wheel Dashboard contributors
+submission: ""
