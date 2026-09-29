@@ -26,10 +26,12 @@ class UmbrelPackageTests(unittest.TestCase):
         self.assertIn("cap_drop:\n      - ALL", compose)
         self.assertIn("no-new-privileges:true", compose)
 
-    def test_image_is_not_falsely_digest_pinned(self):
+    def test_image_is_pinned_to_verified_distribution_digest(self):
         compose = (PACKAGE / "docker-compose.yml").read_text()
-        self.assertIn("ghcr.io/replace-owner/wheel-dashboard:0.3.0", compose)
-        self.assertNotIn("@sha256:", compose)
+        self.assertIn(
+            "ghcr.io/knetter65/wheel-dashboard@sha256:89b9ee1762d1498b42ec8b0afd680e89c016a4d80eeb2cdbf2a9ad627e0e016d",
+            compose,
+        )
 
     def test_context_excludes_private_inputs(self):
         ignored = set((ROOT / ".dockerignore").read_text().splitlines())
