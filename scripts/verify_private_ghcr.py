@@ -505,7 +505,16 @@ def verify_attestation(client: Client, descriptor: dict[str, Any]) -> dict[str, 
                 or not builder_id.startswith("https://github.com/"),
                 "ATTESTATION_BUILDER_MISMATCH",
             )
-            fail(build_type != "https://mobyproject.org/buildkit@v1", "ATTESTATION_BUILD_TYPE_MISMATCH")
+            fail(
+                not isinstance(build_type, str)
+                or not (
+                    build_type == "https://mobyproject.org/buildkit@v1"
+                    or build_type.startswith("https://actions.github.io/")
+                    or build_type.startswith("https://github.com/actions/")
+                    or build_type.startswith("https://github.com/docker/")
+                ),
+                "ATTESTATION_BUILD_TYPE_MISMATCH",
+            )
             builder_ids.add(builder_id)
             build_types.add(build_type)
             statement_subjects = statement.get("subject")
