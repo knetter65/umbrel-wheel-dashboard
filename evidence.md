@@ -1,8 +1,8 @@
 # Private GHCR verification
 
 - Result: **FAIL**
-- Failure code: `PACKAGE_REPOSITORY_MISMATCH`
+- Failure code: `HTTP_STATUS_404`
 - Repository: `knetter65/umbrel-wheel-dashboard`
-- Upstream run: `36590147107`
-- Commit: `df374dc1125524f52655f0ebf4a684ec3fc3e837`
+- Upstream run: `36590848360`
+- Commit: `5a428da6e4fae6ff0c6f375421903a6a9cccefa4`
 - Evidence is sanitized; no raw log or matched content is included.
