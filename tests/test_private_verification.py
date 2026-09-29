@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 import unittest
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -144,6 +145,42 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         with self.assertRaises(verify.VerificationError) as caught:
             verify.repository_metadata(incomplete)
         self.assertEqual(caught.exception.code, "REPOSITORY_NOT_PRIVATE")
+
+    def test_package_metadata_uses_repository_scoped_endpoint(self):
+        class PackageClient:
+            def __init__(self, metadata: dict[str, object]):
+                self.metadata = metadata
+
+            def github(self, path: str):
+                self.test_path = path
+                return verify.HTTPResult(200, {}, json.dumps(self.metadata).encode())
+
+        encoded = urllib.parse.quote(verify.PACKAGE, safe="")
+        client = PackageClient(
+            {"name": verify.PACKAGE, "package_type": "container", "visibility": "private"}
+        )
+        self.assertEqual(
+            verify.package_metadata(client),
+            {
+                "name": verify.PACKAGE,
+                "type": "container",
+                "visibility": "private",
+                "repository": verify.REPOSITORY,
+            },
+        )
+        self.assertEqual(client.test_path, f"/repos/{verify.REPOSITORY}/packages/container/{encoded}")
+
+        mismatched = PackageClient(
+            {
+                "name": verify.PACKAGE,
+                "package_type": "container",
+                "visibility": "private",
+                "repository": {"full_name": "other/repo", "name": "repo"},
+            }
+        )
+        with self.assertRaises(verify.VerificationError) as caught:
+            verify.package_metadata(mismatched)
+        self.assertEqual(caught.exception.code, "PACKAGE_REPOSITORY_MISMATCH")
 
     def test_layer_scan_counts_whiteouts_and_scans_deleted_history(self):
         first = self.make_layer([("app/deleted.txt", b"safe synthetic content")])
