@@ -1,0 +1,176 @@
+{
+  "schema_version": "1.0.0",
+  "namespace": "wheel-dashboard",
+  "snapshot_id": "fixture-2026-09-25-v1",
+  "generated_at": "2026-09-25T12:00:00Z",
+  "sources": [
+    {
+      "kind": "FIXTURE",
+      "quality": "STALE",
+      "cutoff_at": "2026-09-24T20:00:00Z",
+      "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "warnings": [
+        "Synthetische Fase-1-testdata; niet gebruiken voor handelsbeslissingen."
+      ]
+    }
+  ],
+  "account": {
+    "currency": "USD",
+    "total_cash": "10000.00",
+    "net_liquidation": "24750.00",
+    "open_put_assignment_obligation": "3500.00",
+    "cash_after_all_assignments": "6500.00",
+    "external_net_contributions": "20000.00",
+    "realized_trading_pnl": "1725.00",
+    "unrealized_trading_pnl": "830.00"
+  },
+  "positions": [
+    {
+      "position_id": "fixture-pos-alfa-stock",
+      "cycle_id": "WHEEL-ALFA-001",
+      "asset_kind": "STOCK",
+      "underlying": "ALFA",
+      "occ_symbol": null,
+      "quantity": "100",
+      "currency": "USD",
+      "market_price": "46.20",
+      "market_value": "4620.00",
+      "unrealized_pnl": "-180.00"
+    },
+    {
+      "position_id": "fixture-pos-alfa-call",
+      "cycle_id": "WHEEL-ALFA-001",
+      "asset_kind": "OPTION",
+      "underlying": "ALFA",
+      "occ_symbol": "ALFA261016C00045000",
+      "quantity": "-1",
+      "currency": "USD",
+      "market_price": "0.90",
+      "market_value": "-90.00",
+      "unrealized_pnl": "-25.00"
+    },
+    {
+      "position_id": "fixture-pos-beta-put",
+      "cycle_id": "WHEEL-BETA-001",
+      "asset_kind": "OPTION",
+      "underlying": "BETA",
+      "occ_symbol": "BETA261016P00035000",
+      "quantity": "-1",
+      "currency": "USD",
+      "market_price": "0.82",
+      "market_value": "-82.00",
+      "unrealized_pnl": "38.00"
+    }
+  ],
+  "cycles": [
+    {
+      "cycle_id": "WHEEL-ALFA-001",
+      "underlying": "ALFA",
+      "state": "COVERED_CALL_OPEN",
+      "thesis_state": "INTACT",
+      "opened_at": "2026-05-04T14:30:00Z",
+      "closed_at": null,
+      "original_put_strike": "48.00",
+      "remaining_shares": "100",
+      "stock_net_cashflow": "-4800.00",
+      "realized_put_pnl": "150.00",
+      "realized_call_pnl": "80.00",
+      "open_option_cashflow": "65.00",
+      "open_option_close_cost": "90.00",
+      "dividends_net": "25.00",
+      "broker_basis_per_share": "48.00",
+      "locked_break_even": "45.70",
+      "locked_break_even_with_dividends": "45.45",
+      "cashflow_break_even": "45.05",
+      "liquidation_break_even": "45.95",
+      "confidence": "HIGH",
+      "option_legs": [
+        {
+          "option_leg_id": "ALFA-PUT-1",
+          "parent_leg_id": null,
+          "occ_symbol": "ALFA260529P00048000",
+          "side": "PUT",
+          "strike": "48.00",
+          "expiration": "2026-05-29",
+          "contracts": 1,
+          "multiplier": 100,
+          "state": "ASSIGNED"
+        },
+        {
+          "option_leg_id": "ALFA-CALL-2",
+          "parent_leg_id": null,
+          "occ_symbol": "ALFA261016C00045000",
+          "side": "CALL",
+          "strike": "45.00",
+          "expiration": "2026-10-16",
+          "contracts": 1,
+          "multiplier": 100,
+          "state": "OPEN"
+        }
+      ]
+    },
+    {
+      "cycle_id": "WHEEL-BETA-001",
+      "underlying": "BETA",
+      "state": "PUT_OPEN",
+      "thesis_state": "WATCH",
+      "opened_at": "2026-09-18T14:35:00Z",
+      "closed_at": null,
+      "original_put_strike": "35.00",
+      "remaining_shares": "0",
+      "stock_net_cashflow": "0.00",
+      "realized_put_pnl": "0.00",
+      "realized_call_pnl": "0.00",
+      "open_option_cashflow": "120.00",
+      "open_option_close_cost": "82.00",
+      "dividends_net": "0.00",
+      "cashflow_put_break_even": "33.80",
+      "confidence": "HIGH",
+      "option_legs": [
+        {
+          "option_leg_id": "BETA-PUT-1",
+          "parent_leg_id": null,
+          "occ_symbol": "BETA261016P00035000",
+          "side": "PUT",
+          "strike": "35.00",
+          "expiration": "2026-10-16",
+          "contracts": 1,
+          "multiplier": 100,
+          "state": "OPEN"
+        }
+      ]
+    },
+    {
+      "cycle_id": "WHEEL-GAMMA-001",
+      "underlying": "GAMMA",
+      "state": "CLOSED_PUT_ONLY",
+      "thesis_state": "INTACT",
+      "opened_at": "2026-07-06T14:32:00Z",
+      "closed_at": "2026-07-17T20:00:00Z",
+      "original_put_strike": "21.00",
+      "remaining_shares": "0",
+      "stock_net_cashflow": "0.00",
+      "realized_put_pnl": "74.35",
+      "realized_call_pnl": "0.00",
+      "open_option_cashflow": "0.00",
+      "open_option_close_cost": "0.00",
+      "dividends_net": "0.00",
+      "confidence": "HIGH",
+      "option_legs": [
+        {
+          "option_leg_id": "GAMMA-PUT-1",
+          "parent_leg_id": null,
+          "occ_symbol": "GAMMA260717P00021000",
+          "side": "PUT",
+          "strike": "21.00",
+          "expiration": "2026-07-17",
+          "contracts": 1,
+          "multiplier": 100,
+          "state": "EXPIRED"
+        }
+      ]
+    }
+  ],
+  "technicals": [],
+  "reconciliation_issues": []
+}

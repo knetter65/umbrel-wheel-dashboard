@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/wheel-dashboard/dashboard-snapshot.schema.json",
+  "title": "Sanitized Wheel Dashboard Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "namespace", "snapshot_id", "generated_at", "sources", "account", "positions", "cycles", "technicals"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "namespace": {"const": "wheel-dashboard"},
+    "snapshot_id": {"type": "string", "minLength": 8},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "account": {"$ref": "#/$defs/account"},
+    "positions": {"type": "array", "items": {"$ref": "#/$defs/position"}},
+    "cycles": {"type": "array", "items": {"$ref": "#/$defs/cycle"}},
+    "technicals": {"type": "array", "items": {"$ref": "#/$defs/technical"}},
+    "reconciliation_issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}, "default": []}
+  },
+  "$defs": {
+    "decimal": {"type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+    "nonNegativeDecimal": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "quality", "cutoff_at", "content_sha256"],
+      "properties": {
+        "kind": {"enum": ["FIXTURE", "BROKER_HISTORY", "BROKER_SNAPSHOT", "MARKET_HISTORY", "OPTION_QUOTE", "GATE_B", "MANUAL"]},
+        "quality": {"enum": ["LIVE", "DELAYED", "STALE", "MISSING"]},
+        "cutoff_at": {
+          "type": "string",
+          "anyOf": [{"format": "date-time"}, {"format": "date"}]
+        },
+        "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "warnings": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "open_put_assignment_obligation", "external_net_contributions"],
+      "properties": {
+        "currency": {"const": "USD"},
+        "total_cash": {"$ref": "#/$defs/decimal"},
+        "net_liquidation": {"$ref": "#/$defs/decimal"},
+        "open_put_assignment_obligation": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "cash_after_all_assignments": {"$ref": "#/$defs/decimal"},
+        "external_net_contributions": {"oneOf": [{"$ref": "#/$defs/decimal"}, {"type": "null"}]},
+        "realized_trading_pnl": {"oneOf": [{"$ref": "#/$defs/decimal"}, {"type": "null"}]},
+        "unrealized_trading_pnl": {"oneOf": [{"$ref": "#/$defs/decimal"}, {"type": "null"}]}
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position_id", "asset_kind", "underlying", "quantity", "currency"],
+      "properties": {
+        "position_id": {"type": "string"},
+        "cycle_id": {"type": ["string", "null"]},
+        "asset_kind": {"enum": ["STOCK", "OPTION", "CASH"]},
+        "underlying": {"type": "string", "pattern": "^[A-Z.]+$"},
+        "occ_symbol": {"type": ["string", "null"]},
+        "quantity": {"$ref": "#/$defs/decimal"},
+        "currency": {"type": "string"},
+        "market_price": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "market_value": {"$ref": "#/$defs/decimal"},
+        "unrealized_pnl": {"$ref": "#/$defs/decimal"}
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cycle_id", "underlying", "state", "thesis_state", "opened_at", "original_put_strike", "remaining_shares", "stock_net_cashflow", "realized_put_pnl", "realized_call_pnl", "open_option_cashflow", "open_option_close_cost", "dividends_net", "confidence", "option_legs"],
+      "properties": {
+        "cycle_id": {"type": "string"},
+        "underlying": {"type": "string", "pattern": "^[A-Z.]+$"},
+        "state": {"enum": ["PUT_OPEN", "ASSIGNED_NO_CALL", "COVERED_CALL_OPEN", "PARTIALLY_COVERED", "CLOSED_PUT_ONLY", "CLOSED_CALLED_AWAY", "CLOSED_STOCK_SOLD", "UNRESOLVED"]},
+        "thesis_state": {"enum": ["INTACT", "WATCH", "THESIS_BROKEN", "REVIEW_DUE"]},
+        "opened_at": {"type": "string", "format": "date-time"},
+        "closed_at": {"type": ["string", "null"], "format": "date-time"},
+        "original_put_strike": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "remaining_shares": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "stock_net_cashflow": {"$ref": "#/$defs/decimal"},
+        "realized_put_pnl": {"$ref": "#/$defs/decimal"},
+        "realized_call_pnl": {"$ref": "#/$defs/decimal"},
+        "open_option_cashflow": {"$ref": "#/$defs/decimal"},
+        "open_option_close_cost": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "dividends_net": {"$ref": "#/$defs/decimal"},
+        "broker_basis_per_share": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "locked_break_even": {"$ref": "#/$defs/decimal"},
+        "locked_break_even_with_dividends": {"$ref": "#/$defs/decimal"},
+        "cashflow_break_even": {"$ref": "#/$defs/decimal"},
+        "cashflow_put_break_even": {"$ref": "#/$defs/decimal"},
+        "liquidation_break_even": {"$ref": "#/$defs/decimal"},
+        "confidence": {"enum": ["HIGH", "MEDIUM", "LOW", "MANUAL_REVIEW"]},
+        "option_legs": {"type": "array", "items": {"$ref": "#/$defs/optionLeg"}, "default": []}
+      }
+    },
+    "optionLeg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["option_leg_id", "occ_symbol", "side", "strike", "expiration", "contracts", "state"],
+      "properties": {
+        "option_leg_id": {"type": "string"},
+        "parent_leg_id": {"type": ["string", "null"]},
+        "occ_symbol": {"type": "string"},
+        "side": {"enum": ["PUT", "CALL"]},
+        "strike": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "expiration": {"type": "string", "format": "date"},
+        "contracts": {"type": "integer", "minimum": 1},
+        "multiplier": {"type": "integer", "minimum": 1, "default": 100},
+        "state": {"enum": ["OPEN", "CLOSED", "EXPIRED", "ASSIGNED", "EXERCISED", "UNRESOLVED"]}
+      }
+    },
+    "technical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["underlying", "as_of_session", "close", "bollinger_period", "bollinger_stddev", "rsi_period", "rating"],
+      "properties": {
+        "underlying": {"type": "string", "pattern": "^[A-Z.]+$"},
+        "as_of_session": {"type": "string", "format": "date"},
+        "close": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "sma20": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "sma50": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "sma200": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "bollinger_period": {"const": 20},
+        "bollinger_stddev": {"const": "2"},
+        "bollinger_lower": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "bollinger_middle": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "bollinger_upper": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "bollinger_position": {"$ref": "#/$defs/decimal"},
+        "rsi_period": {"const": 14},
+        "rsi": {"$ref": "#/$defs/nonNegativeDecimal"},
+        "rating": {"enum": ["STRONG", "ACCEPTABLE", "CAUTION", "REJECT"]},
+        "stabilization": {"type": "boolean"}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue_id", "severity", "kind", "message"],
+      "properties": {
+        "issue_id": {"type": "string"},
+        "severity": {"enum": ["INFO", "WARNING", "HARD_STOP"]},
+        "kind": {"type": "string"},
+        "cycle_id": {"type": ["string", "null"]},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

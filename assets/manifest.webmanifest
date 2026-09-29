@@ -1,0 +1,9 @@
+{
+  "name": "Wheel Dashboard",
+  "short_name": "Wheel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080d18",
+  "theme_color": "#0b1220",
+  "description": "Private read-only Wheel management dashboard"
+}

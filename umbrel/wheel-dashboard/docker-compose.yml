@@ -1,0 +1,35 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: wheel-dashboard_server_1
+      APP_PORT: 8050
+
+  server:
+    # Replace this pre-publication tag with the real GHCR distribution digest.
+    image: ghcr.io/replace-owner/wheel-dashboard:0.3.0
+    user: "1000:1000"
+    init: true
+    restart: on-failure
+    read_only: true
+    environment:
+      WHEEL_DASHBOARD_DATA_DIR: /data
+      WHEEL_DASHBOARD_READ_ONLY: "1"
+      WHEEL_DASHBOARD_HOST: 0.0.0.0
+      WHEEL_DASHBOARD_PORT: "8050"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ${APP_DATA_DIR}/data:/data:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8050/healthz', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
