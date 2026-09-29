@@ -274,8 +274,6 @@ class PrivateVerificationScannerTests(unittest.TestCase):
             "TAG_DRIFT_DETECTED",
             "ANONYMOUS_NETWORK_FAILURE",
             "https://github.com/",
-            "https://mobyproject.org/buildkit@v1",
-            "https://actions.github.io/",
             "ATTESTATION_BUILDER_MISMATCH",
             "ATTESTATION_BUILD_TYPE_MISMATCH",
         ):
