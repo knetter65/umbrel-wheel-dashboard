@@ -24,6 +24,13 @@ PACKAGE = "wheel-dashboard"
 IMAGE = f"ghcr.io/{OWNER}/{PACKAGE}"
 TAG = "0.3.0"
 EVIDENCE_BRANCH = "verification/private-0.3.0"
+COMPOSE_PATH = "umbrel/wheel-dashboard/docker-compose.yml"
+PINNED_INDEX_DIGEST = "sha256:89b9ee1762d1498b42ec8b0afd680e89c016a4d80eeb2cdbf2a9ad627e0e016d"
+PINNED_REVISION = "7b8dbf7d8747e3c421638d5523d8feddad143c58"
+PINNED_MANIFESTS = {
+    "linux/amd64": "sha256:5fbe255743f38d15a4bdaa52bdcec4202539d057f4c17cd26e628b8d6c97b178",
+    "linux/arm64": "sha256:e7d720bc88071890441f8b6bc2aa0755b09aaae727f332df12c04e4362b551c0",
+}
 EXPECTED_PLATFORMS = {("linux", "amd64"), ("linux", "arm64")}
 MAX_API_BYTES = 128 * 1024 * 1024
 MANIFEST_ACCEPT = ", ".join(
@@ -294,7 +301,7 @@ def repository_metadata(client: Client) -> dict[str, str]:
     return {"full_name": REPOSITORY, "visibility": "private"}
 
 
-def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
+def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any], bool]:
     run = safe_json(client.github(f"/repos/{REPOSITORY}/actions/runs/{run_id}").body, "RUN_JSON")
     fail(run.get("id") != run_id, "RUN_ID_MISMATCH")
     fail(run.get("name") != "ci", "RUN_WORKFLOW_MISMATCH")
@@ -325,9 +332,13 @@ def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str
         fail(page > 20, "JOBS_PAGINATION_LIMIT")
     fail(not jobs, "JOBS_EMPTY")
     fail(any(job["status"] != "completed" or job["conclusion"] not in {"success", "skipped"} for job in jobs), "UPSTREAM_JOB_FAILURE")
-    required = {"test", "publish-private-ghcr"}
+    required = {"test", "detect-image-changes"}
     successful = {str(job["name"]).split(" / ")[-1] for job in jobs if job["conclusion"] == "success"}
     fail(not required.issubset(successful), "REQUIRED_JOBS_MISSING")
+    publish_jobs = [job for job in jobs if str(job["name"]).split(" / ")[-1] == "publish-private-ghcr"]
+    fail(len(publish_jobs) != 1, "PUBLISH_JOB_CARDINALITY")
+    publish_conclusion = publish_jobs[0]["conclusion"]
+    fail(publish_conclusion not in {"success", "skipped"}, "PUBLISH_JOB_INVALID")
 
     logs = scan_logs(client.github(f"/repos/{REPOSITORY}/actions/runs/{run_id}/attempts/{attempt}/logs").body)
     summary = {
@@ -339,7 +350,7 @@ def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str
         "status": run["status"],
         "conclusion": run["conclusion"],
     }
-    return summary, jobs, logs
+    return summary, jobs, logs, publish_conclusion == "success"
 
 
 def package_metadata(client: Client) -> dict[str, Any]:
@@ -643,11 +654,23 @@ def classify_descriptor_tree(
     )
 
 
-def registry_evidence(client: Client, sha: str, root: Path) -> dict[str, Any]:
+def compose_reference(root: Path) -> str:
+    expected = f"{IMAGE}@{PINNED_INDEX_DIGEST}"
+    compose = (root / COMPOSE_PATH).read_text(encoding="utf-8")
+    references = re.findall(r"^\s*image:\s*(\S+)\s*$", compose, flags=re.MULTILINE)
+    fail(references != [expected], "COMPOSE_REFERENCE_MISMATCH")
+    return expected
+
+
+def registry_evidence(client: Client, sha: str, root: Path, publication_succeeded: bool) -> dict[str, Any]:
     client.acquire_registry_token()
-    first = client.registry(TAG, manifest=True)
+    compose = compose_reference(root)
+    reference = TAG if publication_succeeded else PINNED_INDEX_DIGEST
+    expected_revision = sha if publication_succeeded else PINNED_REVISION
+    first = client.registry(reference, manifest=True)
     index_digest = first.headers.get("Docker-Content-Digest")
     fail(not isinstance(index_digest, str) or not digest_ok(first.body, index_digest), "INDEX_DIGEST_MISMATCH")
+    fail(not publication_succeeded and index_digest != PINNED_INDEX_DIGEST, "PINNED_INDEX_MISMATCH")
     index = safe_json(first.body, "INDEX_JSON")
     fail(index.get("mediaType") not in INDEX_TYPES, "ROOT_NOT_INDEX")
     descriptors = index.get("manifests")
@@ -665,17 +688,25 @@ def registry_evidence(client: Client, sha: str, root: Path) -> dict[str, Any]:
     fail(len(attestations) != 2, "PROVENANCE_SET_MISMATCH")
 
     expected = controlled_files(root)
-    images = [verify_image(client, descriptor, sha, expected) for descriptor in runnable]
+    images = [verify_image(client, descriptor, expected_revision, expected) for descriptor in runnable]
+    if not publication_succeeded:
+        actual_manifests = {
+            f"{image['platform']['os']}/{image['platform']['architecture']}": image["manifest_digest"]
+            for image in images
+        }
+        fail(actual_manifests != PINNED_MANIFESTS, "PINNED_MANIFEST_SET_MISMATCH")
     provenance = [verify_attestation(client, descriptor) for descriptor in attestations]
     image_digests = {image["manifest_digest"] for image in images}
     fail({item["subject_digest"] for item in provenance} != image_digests, "PROVENANCE_COVERAGE_MISMATCH")
 
     anonymous = anonymous_denial(index_digest)
-    second = client.registry(TAG, manifest=True)
+    second = client.registry(reference, manifest=True)
     second_digest = second.headers.get("Docker-Content-Digest")
     fail(second_digest != index_digest or second.body != first.body, "TAG_DRIFT_DETECTED")
     return {
-        "image": f"{IMAGE}:{TAG}",
+        "image": f"{IMAGE}:{TAG}" if publication_succeeded else compose,
+        "verification_mode": "published_tag" if publication_succeeded else "compose_pinned_digest",
+        "compose_reference": compose,
         "authorized_read": "success",
         "anonymous_read": anonymous,
         "index_digest": index_digest,
@@ -750,9 +781,9 @@ def main() -> int:
         fail(not re.fullmatch(r"[0-9a-f]{40}", sha), "COMMIT_SHA_INVALID")
         client = Client(os.environ.get("GITHUB_TOKEN", ""), os.environ.get("GITHUB_ACTOR", ""))
         repository = repository_metadata(client)
-        upstream, jobs, logs = github_run_and_jobs(client, run_id, sha)
+        upstream, jobs, logs, publication_succeeded = github_run_and_jobs(client, run_id, sha)
         package = package_metadata(client)
-        registry = registry_evidence(client, sha, Path(__file__).resolve().parents[1])
+        registry = registry_evidence(client, sha, Path(__file__).resolve().parents[1], publication_succeeded)
         evidence = {
             "schema": 1,
             "result": "PASS",

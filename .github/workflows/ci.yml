@@ -27,9 +27,37 @@ jobs:
         run: |
           git diff --exit-code -- .
           test -z "$(git ls-files --others --exclude-standard)"
-  publish-private-ghcr:
-    needs: test
+  detect-image-changes:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'knetter65/umbrel-wheel-dashboard'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect changes to the exact image build inputs
+        id: diff
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid before SHA" >&2
+            exit 1
+          fi
+          if [ "$BEFORE_SHA" = 0000000000000000000000000000000000000000 ]; then
+            changed=true
+          elif git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- Dockerfile pyproject.toml uv.lock src schema assets fixtures; then
+            changed=false
+          else
+            changed=true
+          fi
+          printf 'changed=%s\n' "$changed" >> "$GITHUB_OUTPUT"
+  publish-private-ghcr:
+    needs: [test, detect-image-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'knetter65/umbrel-wheel-dashboard' && needs.detect-image-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

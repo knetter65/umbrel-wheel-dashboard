@@ -73,6 +73,9 @@ class PrivateVerificationWorkflowTests(unittest.TestCase):
         self.assertIn("push:\n    branches: [main]", self.ci)
         self.assertIn("github.ref == 'refs/heads/main'", self.ci)
         self.assertIn("github.event_name == 'push'", self.ci)
+        self.assertIn("detect-image-changes:", self.ci)
+        self.assertIn("needs.detect-image-changes.outputs.changed == 'true'", self.ci)
+        self.assertIn("Dockerfile pyproject.toml uv.lock src schema assets fixtures", self.ci)
 
     def test_all_third_party_actions_are_commit_pinned(self):
         for path in (WORKFLOW, CI):
@@ -276,8 +279,18 @@ class PrivateVerificationScannerTests(unittest.TestCase):
             "https://github.com/",
             "ATTESTATION_BUILDER_MISMATCH",
             "ATTESTATION_BUILD_TYPE_MISMATCH",
+            verify.PINNED_INDEX_DIGEST,
+            verify.PINNED_MANIFESTS["linux/amd64"],
+            verify.PINNED_MANIFESTS["linux/arm64"],
+            "COMPOSE_REFERENCE_MISMATCH",
         ):
             self.assertIn(value, source)
+
+    def test_compose_reference_is_exactly_the_approved_index(self):
+        self.assertEqual(
+            verify.compose_reference(ROOT),
+            f"{verify.IMAGE}@{verify.PINNED_INDEX_DIGEST}",
+        )
 
 
 if __name__ == "__main__":
