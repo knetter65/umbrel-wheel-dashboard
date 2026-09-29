@@ -208,6 +208,9 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         layer = self.make_layer([(".venv/lib/python3.13/site-packages/dash/dash.py", payload)])
         result = verify.scan_layer(layer, verify.sha256_bytes(layer), {})
         self.assertEqual(result["regular_files"], 1)
+        nested = self.make_layer([("app/.venv/lib/python3.13/site-packages/dash/dash.py", payload)])
+        nested_result = verify.scan_layer(nested, verify.sha256_bytes(nested), {})
+        self.assertEqual(nested_result["regular_files"], 1)
 
     def test_application_write_route_still_fails_closed(self):
         payload = b"@app.route('/orders', methods=['POST'])"

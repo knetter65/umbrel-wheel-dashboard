@@ -194,7 +194,12 @@ def scan_dependency_bytes(data: bytes) -> set[str]:
 
 
 def is_application_path(path: str) -> bool:
-    return path == "app" or path.startswith("app/")
+    parts = tuple(part for part in PurePosixPath(path).parts if part not in {".", ""})
+    if parts and parts[0] == "app":
+        parts = parts[1:]
+    if not parts or parts[0] in {".venv", "venv", "node_modules", "__pycache__"}:
+        return False
+    return parts[0] in {"src", "schema", "assets", "fixtures"} or parts in {("pyproject.toml",), ("uv.lock",)}
 
 
 def scan_stream(stream: BinaryIO, size: int) -> tuple[int, set[str]]:
