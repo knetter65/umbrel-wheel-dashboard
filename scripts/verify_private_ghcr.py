@@ -60,12 +60,26 @@ POLICY_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("write_route", re.compile(rb"(?i)(?:route\s*\([^\n]{0,160}methods\s*=\s*[^\n]{0,80}(?:post|put|patch|delete))")),
 )
 APPLICATION_POLICY_CATEGORIES = {"order_capability", "write_route"}
+DEPENDENCY_POLICY_CATEGORIES = {
+    "forbidden_identity",
+    "broker_or_account_data",
+    "private_deployment",
+    "proprietary_training",
+    "credential_value",
+}
 
 
 class VerificationError(RuntimeError):
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code
+        self.categories: tuple[str, ...] = ()
+
+
+class PolicyMatchError(VerificationError):
+    def __init__(self, code: str, categories: set[str]):
+        super().__init__(code)
+        self.categories = tuple(sorted(categories))
 
 
 def fail(condition: bool, code: str) -> None:
@@ -190,7 +204,7 @@ def scan_application_bytes(data: bytes) -> set[str]:
 
 
 def scan_dependency_bytes(data: bytes) -> set[str]:
-    return {name for name in scan_bytes(data) if name not in APPLICATION_POLICY_CATEGORIES}
+    return {name for name in scan_bytes(data) if name in DEPENDENCY_POLICY_CATEGORIES}
 
 
 def is_application_path(path: str) -> bool:
@@ -368,10 +382,11 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                 fail(raw_path.is_absolute() or ".." in raw_path.parts, "UNSAFE_LAYER_PATH")
                 path = PurePosixPath(member.name[2:] if member.name.startswith("./") else member.name)
                 normalized = path.as_posix()
-                findings.update(scan_bytes(normalized.encode()))
-                findings.update(scan_bytes(member.linkname.encode()))
+                metadata_scanner = scan_application_bytes if is_application_path(normalized) else scan_dependency_bytes
+                findings.update(metadata_scanner(normalized.encode()))
+                findings.update(metadata_scanner(member.linkname.encode()))
                 for key, value in sorted(member.pax_headers.items()):
-                    findings.update(scan_bytes(f"{key}={value}".encode()))
+                    findings.update(metadata_scanner(f"{key}={value}".encode()))
                 name = path.name
                 if name == ".wh..wh..opq":
                     whiteouts += 1
@@ -392,8 +407,7 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                     payload = source.read()
                     fail(len(payload) != member.size, "LAYER_MEMBER_SIZE_MISMATCH")
                     bytes_scanned += len(payload)
-                    scanner = scan_application_bytes if is_application_path(normalized) else scan_dependency_bytes
-                    findings.update(scanner(payload))
+                    findings.update(metadata_scanner(payload))
                     prefix = normalized.rstrip("/") + "/"
                     for existing in list(overlay):
                         if existing.startswith(prefix):
@@ -409,7 +423,8 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                     overlay[normalized] = "nonregular:" + member.type.hex()
     except (tarfile.TarError, OSError) as exc:
         raise VerificationError("LAYER_TAR_INVALID") from exc
-    fail(bool(findings), "IMAGE_LAYER_POLICY_MATCH")
+    if findings:
+        raise PolicyMatchError("IMAGE_LAYER_POLICY_MATCH", findings)
     return {
         "digest": digest,
         "diff_id": diff_id,
@@ -641,19 +656,25 @@ def registry_evidence(client: Client, sha: str, root: Path) -> dict[str, Any]:
 
 def markdown(evidence: dict[str, Any]) -> str:
     if evidence["result"] != "PASS":
-        return "\n".join(
+        lines = [
+            "# Private GHCR verification",
+            "",
+            f"- Result: **FAIL**",
+            f"- Failure code: `{evidence['failure_code']}`",
+            f"- Repository: `{REPOSITORY}`",
+            f"- Upstream run: `{evidence['run_id']}`",
+            f"- Commit: `{evidence['commit']}`",
+        ]
+        categories = evidence.get("policy_categories") or []
+        if categories:
+            lines.append("- Policy categories: `" + "`, `".join(categories) + "`")
+        lines.extend(
             (
-                "# Private GHCR verification",
-                "",
-                f"- Result: **FAIL**",
-                f"- Failure code: `{evidence['failure_code']}`",
-                f"- Repository: `{REPOSITORY}`",
-                f"- Upstream run: `{evidence['run_id']}`",
-                f"- Commit: `{evidence['commit']}`",
                 "- Evidence is sanitized; no raw log or matched content is included.",
                 "",
             )
         )
+        return "\n".join(lines)
     registry = evidence["registry"]
     lines = [
         "# Private GHCR verification",
@@ -725,6 +746,8 @@ def main() -> int:
         return 0
     except VerificationError as exc:
         evidence = {**base, "result": "FAIL", "failure_code": exc.code, "sanitized": True}
+        if exc.categories:
+            evidence["policy_categories"] = list(exc.categories)
         write_evidence(output, evidence)
         print(f"PRIVATE_GHCR_VERIFICATION_FAIL code={exc.code}", file=sys.stderr)
         return 1

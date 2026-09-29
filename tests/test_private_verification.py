@@ -218,6 +218,7 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         with self.assertRaises(verify.VerificationError) as caught:
             verify.scan_layer(layer, verify.sha256_bytes(layer), {})
         self.assertEqual(caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
+        self.assertEqual(caught.exception.categories, ("order_capability", "write_route"))
 
     def test_failure_evidence_is_compact_and_sanitized(self):
         with tempfile.TemporaryDirectory() as directory:
