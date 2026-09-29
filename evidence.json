@@ -1,1 +1,1 @@
-{"commit":"9a1983591c1bf1218d0e17916e665789fb2b495a","failure_code":"IMAGE_LAYER_POLICY_MATCH","policy_categories":["broker_or_account_data","forbidden_identity"],"repository":"knetter65/umbrel-wheel-dashboard","result":"FAIL","run_id":"36593546255","sanitized":true,"schema":1}
+{"commit":"13e3948d332b4b0e2d536dab7237843c43d9942a","failure_code":"IMAGE_LAYER_POLICY_MATCH","policy_categories":["credential_value","private_deployment"],"repository":"knetter65/umbrel-wheel-dashboard","result":"FAIL","run_id":"36594211129","sanitized":true,"schema":1}
