@@ -203,6 +203,19 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
         self.assertNotIn(secret.decode(), str(caught.exception))
 
+    def test_dependency_write_route_is_not_treated_as_application_capability(self):
+        payload = b"@app.route('/_dash-update-component', methods=['POST'])"
+        layer = self.make_layer([(".venv/lib/python3.13/site-packages/dash/dash.py", payload)])
+        result = verify.scan_layer(layer, verify.sha256_bytes(layer), {})
+        self.assertEqual(result["regular_files"], 1)
+
+    def test_application_write_route_still_fails_closed(self):
+        payload = b"@app.route('/orders', methods=['POST'])"
+        layer = self.make_layer([("app/src/app.py", payload)])
+        with self.assertRaises(verify.VerificationError) as caught:
+            verify.scan_layer(layer, verify.sha256_bytes(layer), {})
+        self.assertEqual(caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
+
     def test_failure_evidence_is_compact_and_sanitized(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)

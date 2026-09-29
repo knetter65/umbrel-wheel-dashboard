@@ -59,6 +59,7 @@ POLICY_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("order_capability", re.compile(rb"(?i)(?:place[_ -]?order|submit[_ -]?order|transmit[_ -]?order|/orders?(?:/|\b).{0,32}(?:post|put|patch|delete))")),
     ("write_route", re.compile(rb"(?i)(?:route\s*\([^\n]{0,160}methods\s*=\s*[^\n]{0,80}(?:post|put|patch|delete))")),
 )
+APPLICATION_POLICY_CATEGORIES = {"order_capability", "write_route"}
 
 
 class VerificationError(RuntimeError):
@@ -182,6 +183,18 @@ class Client:
 
 def scan_bytes(data: bytes) -> set[str]:
     return {name for name, pattern in POLICY_PATTERNS if pattern.search(data)}
+
+
+def scan_application_bytes(data: bytes) -> set[str]:
+    return scan_bytes(data)
+
+
+def scan_dependency_bytes(data: bytes) -> set[str]:
+    return {name for name in scan_bytes(data) if name not in APPLICATION_POLICY_CATEGORIES}
+
+
+def is_application_path(path: str) -> bool:
+    return path == "app" or path.startswith("app/")
 
 
 def scan_stream(stream: BinaryIO, size: int) -> tuple[int, set[str]]:
@@ -374,7 +387,8 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                     payload = source.read()
                     fail(len(payload) != member.size, "LAYER_MEMBER_SIZE_MISMATCH")
                     bytes_scanned += len(payload)
-                    findings.update(scan_bytes(payload))
+                    scanner = scan_application_bytes if is_application_path(normalized) else scan_dependency_bytes
+                    findings.update(scanner(payload))
                     prefix = normalized.rstrip("/") + "/"
                     for existing in list(overlay):
                         if existing.startswith(prefix):
