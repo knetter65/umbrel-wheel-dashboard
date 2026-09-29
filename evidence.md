@@ -1,8 +1,8 @@
 # Private GHCR verification
 
 - Result: **FAIL**
-- Failure code: `HTTP_STATUS_404`
+- Failure code: `IMAGE_LAYER_POLICY_MATCH`
 - Repository: `knetter65/umbrel-wheel-dashboard`
-- Upstream run: `36590848360`
-- Commit: `5a428da6e4fae6ff0c6f375421903a6a9cccefa4`
+- Upstream run: `36591484230`
+- Commit: `021f355ebd68a368834e0bc9e8cd7f989cd5e9ac`
 - Evidence is sanitized; no raw log or matched content is included.
