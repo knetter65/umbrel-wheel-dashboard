@@ -168,7 +168,7 @@ class PrivateVerificationScannerTests(unittest.TestCase):
                 "repository": verify.REPOSITORY,
             },
         )
-        self.assertEqual(client.test_path, f"/repos/{verify.REPOSITORY}/packages/container/{encoded}")
+        self.assertEqual(client.test_path, f"/users/{verify.OWNER}/packages/container/{encoded}")
 
         mismatched = PackageClient(
             {

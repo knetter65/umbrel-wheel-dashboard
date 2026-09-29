@@ -289,11 +289,13 @@ def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str
 def package_metadata(client: Client) -> dict[str, Any]:
     encoded = urllib.parse.quote(PACKAGE, safe="")
     package = safe_json(
-        client.github(f"/repos/{REPOSITORY}/packages/container/{encoded}").body,
+        client.github(f"/users/{OWNER}/packages/container/{encoded}").body,
         "PACKAGE_JSON",
     )
     fail(package.get("name") != PACKAGE or package.get("package_type") != "container", "PACKAGE_IDENTITY_MISMATCH")
     fail(package.get("visibility") != "private", "PACKAGE_NOT_PRIVATE")
+    owner = package.get("owner") or {}
+    fail(owner.get("login") not in {None, OWNER}, "PACKAGE_OWNER_MISMATCH")
     repository = package.get("repository") or {}
     if repository:
         fail(
