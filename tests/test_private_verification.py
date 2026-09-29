@@ -205,6 +205,15 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         os_layer = self.make_layer([("usr/share/doc/example.txt", secret)])
         os_result = verify.scan_layer(os_layer, verify.sha256_bytes(os_layer), {})
         self.assertEqual(os_result["regular_files"], 1)
+        pem = b"-----BEGIN PRIVATE KEY-----\nABCDEFGHIJKLMNOP\n-----END PRIVATE KEY-----\n"
+        os_pem = self.make_layer([("usr/share/doc/openssl/examples/key.pem", pem)])
+        os_pem_result = verify.scan_layer(os_pem, verify.sha256_bytes(os_pem), {})
+        self.assertEqual(os_pem_result["regular_files"], 1)
+        app_pem = self.make_layer([("app/src/app.py", pem)])
+        with self.assertRaises(verify.VerificationError) as pem_caught:
+            verify.scan_layer(app_pem, verify.sha256_bytes(app_pem), {})
+        self.assertEqual(pem_caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
+        self.assertIn("credential_pem", pem_caught.exception.categories)
 
     def test_dependency_write_route_is_not_treated_as_application_capability(self):
         payload = b"@app.route('/_dash-update-component', methods=['POST'])"

@@ -55,8 +55,11 @@ PRIVATE_DEPLOYMENT_STRONG_PATTERN = (
 PRIVATE_DEPLOYMENT_TOKEN_PATTERN = (
     rb"(?i)(?:" + b"tail" + b"scale" + rb"|100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3})"
 )
-CREDENTIAL_STRONG_PATTERN = re.compile(
-    rb"(?:-----BEGIN (?:OPENSSH |RSA |EC |DSA )?PRIVATE KEY-----|\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b)"
+CREDENTIAL_TOKEN_PATTERN = re.compile(
+    rb"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b"
+)
+CREDENTIAL_PEM_PATTERN = re.compile(
+    rb"-----BEGIN (?:OPENSSH |RSA |EC |DSA )?PRIVATE KEY-----"
 )
 POLICY_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("forbidden_identity", re.compile(PRIVATE_IDENTITY_STRONG_PATTERN)),
@@ -66,7 +69,8 @@ POLICY_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("private_deployment", re.compile(PRIVATE_DEPLOYMENT_STRONG_PATTERN)),
     ("private_deployment_token", re.compile(PRIVATE_DEPLOYMENT_TOKEN_PATTERN)),
     ("proprietary_training", re.compile(rb"(?i)(?:proprietary[_ -]?(?:training|dataset)|private[_ -]?training[_ -]?data)")),
-    ("credential_value", CREDENTIAL_STRONG_PATTERN),
+    ("credential_value", CREDENTIAL_TOKEN_PATTERN),
+    ("credential_pem", CREDENTIAL_PEM_PATTERN),
     ("credential_assignment", re.compile(rb"(?i)(?:password|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*['\"]?(?!\*+\b|x+\b|none\b|null\b|example\b|placeholder\b)[A-Za-z0-9_./+:-]{12,}")),
     ("order_capability", re.compile(rb"(?i)(?:place[_ -]?order|submit[_ -]?order|transmit[_ -]?order|/orders?(?:/|\b).{0,32}(?:post|put|patch|delete))")),
     ("write_route", re.compile(rb"(?i)(?:route\s*\([^\n]{0,160}methods\s*=\s*[^\n]{0,80}(?:post|put|patch|delete))")),
@@ -78,6 +82,7 @@ APPLICATION_POLICY_CATEGORIES = {
     "broker_token",
     "private_deployment_token",
     "credential_assignment",
+    "credential_pem",
 }
 DEPENDENCY_POLICY_CATEGORIES = {
     "forbidden_identity",
