@@ -4,6 +4,11 @@ ARG PYTHON_IMAGE=python:3.13.5-slim@sha256:fd07246d45ebcfd139882601b71eea086ffa8
 FROM ${UV_IMAGE} AS uv
 FROM ${PYTHON_IMAGE}
 
+ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.source="https://github.com/knetter65/umbrel-wheel-dashboard" \
+      org.opencontainers.image.revision="${SOURCE_COMMIT}" \
+      org.opencontainers.image.version="0.3.0"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \

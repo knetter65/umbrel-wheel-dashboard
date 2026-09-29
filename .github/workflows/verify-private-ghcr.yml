@@ -1,0 +1,106 @@
+name: verify-private-ghcr
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+permissions: {}
+jobs:
+  verify-private-ghcr:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.repository == 'knetter65/umbrel-wheel-dashboard' &&
+      github.event.workflow_run.name == 'ci' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      packages: read
+      contents: write
+    env:
+      UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+      UPSTREAM_SHA: ${{ github.event.workflow_run.head_sha }}
+      EVIDENCE_DIR: ${{ runner.temp }}/private-ghcr-evidence
+      EVIDENCE_BRANCH: verification/private-0.3.0
+    steps:
+      - name: Checkout the exact upstream commit without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Recheck immutable workflow-run guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_run
+          test "$GITHUB_REPOSITORY" = knetter65/umbrel-wheel-dashboard
+          test "${{ github.event.workflow_run.name }}" = ci
+          test "${{ github.event.workflow_run.event }}" = push
+          test "${{ github.event.workflow_run.head_branch }}" = main
+          test "${{ github.event.workflow_run.conclusion }}" = success
+          test "$(git rev-parse HEAD)" = "$UPSTREAM_SHA"
+      - name: Verify private package, immutable artifact and complete image contents
+        id: verify
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/verify_private_ghcr.py
+      - name: Publish sanitized evidence only
+        id: evidence
+        if: ${{ always() && steps.verify.outcome != 'skipped' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -f "$EVIDENCE_DIR/evidence.json"
+          test -f "$EVIDENCE_DIR/evidence.md"
+          test "$(find "$EVIDENCE_DIR" -maxdepth 1 -type f -printf '%f\n' | sort | tr '\n' ' ')" = "evidence.json evidence.md "
+
+          askpass="$RUNNER_TEMP/git-askpass-private-verification.sh"
+          printf '%s\n' '#!/bin/sh' 'case "$1" in' '*Username*) printf "%s\n" x-access-token ;;' '*) printf "%s\n" "$GITHUB_TOKEN" ;;' 'esac' > "$askpass"
+          chmod 0700 "$askpass"
+          export GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0
+          remote="https://github.com/$GITHUB_REPOSITORY.git"
+          evidence_repo="$RUNNER_TEMP/private-verification-branch"
+
+          set +e
+          git ls-remote --exit-code "$remote" "refs/heads/$EVIDENCE_BRANCH" > "$RUNNER_TEMP/evidence-remote.txt"
+          branch_status=$?
+          set -e
+          if [ "$branch_status" -eq 0 ]; then
+            git clone --quiet --depth 1 --single-branch --branch "$EVIDENCE_BRANCH" "$remote" "$evidence_repo"
+            test "$(git -C "$evidence_repo" ls-files | sort | tr '\n' ' ')" = "evidence.json evidence.md "
+            test -f "$evidence_repo/evidence.json" && test ! -L "$evidence_repo/evidence.json"
+            test -f "$evidence_repo/evidence.md" && test ! -L "$evidence_repo/evidence.md"
+          elif [ "$branch_status" -eq 2 ]; then
+            mkdir "$evidence_repo"
+            git -C "$evidence_repo" init --quiet --initial-branch="$EVIDENCE_BRANCH"
+            git -C "$evidence_repo" remote add origin "$remote"
+          else
+            exit "$branch_status"
+          fi
+
+          install -m 0644 "$EVIDENCE_DIR/evidence.json" "$evidence_repo/evidence.json"
+          install -m 0644 "$EVIDENCE_DIR/evidence.md" "$evidence_repo/evidence.md"
+          git -C "$evidence_repo" config user.name github-actions-private-verifier
+          git -C "$evidence_repo" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$evidence_repo" add evidence.json evidence.md
+          if ! git -C "$evidence_repo" diff --cached --quiet; then
+            git -C "$evidence_repo" commit --quiet -m "Verify private GHCR run $UPSTREAM_RUN_ID at $UPSTREAM_SHA"
+          fi
+          local_sha="$(git -C "$evidence_repo" rev-parse HEAD)"
+          git -C "$evidence_repo" push --quiet origin "HEAD:refs/heads/$EVIDENCE_BRANCH"
+          remote_sha="$(git ls-remote "$remote" "refs/heads/$EVIDENCE_BRANCH" | cut -f1)"
+          test -n "$remote_sha"
+          test "$remote_sha" = "$local_sha"
+          printf 'remote_sha=%s\n' "$remote_sha" >> "$GITHUB_OUTPUT"
+          rm -f "$askpass" "$RUNNER_TEMP/evidence-remote.txt"
+      - name: Enforce verification result after evidence publication
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          test "${{ steps.verify.outcome }}" = success
+          test "${{ steps.evidence.outcome }}" = success
