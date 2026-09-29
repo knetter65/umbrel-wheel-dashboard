@@ -211,6 +211,19 @@ class PrivateVerificationScannerTests(unittest.TestCase):
         nested = self.make_layer([("app/.venv/lib/python3.13/site-packages/dash/dash.py", payload)])
         nested_result = verify.scan_layer(nested, verify.sha256_bytes(nested), {})
         self.assertEqual(nested_result["regular_files"], 1)
+        identity_token = b"l" + b"so"
+        broker_token = b"t" + b"ws"
+        os_tokens = self.make_layer([("usr/share/dict/words", identity_token + b"\n" + broker_token + b"\n")])
+        os_result = verify.scan_layer(os_tokens, verify.sha256_bytes(os_tokens), {})
+        self.assertEqual(os_result["regular_files"], 1)
+
+    def test_application_identity_token_still_fails_closed(self):
+        payload = b"project = '" + b"l" + b"so" + b"-wheel-dashboard'\n"
+        layer = self.make_layer([("app/src/app.py", payload)])
+        with self.assertRaises(verify.VerificationError) as caught:
+            verify.scan_layer(layer, verify.sha256_bytes(layer), {})
+        self.assertEqual(caught.exception.code, "IMAGE_LAYER_POLICY_MATCH")
+        self.assertIn("forbidden_identity", caught.exception.categories)
 
     def test_application_write_route_still_fails_closed(self):
         payload = b"@app.route('/orders', methods=['POST'])"

@@ -43,23 +43,27 @@ MANIFEST_TYPES = {
     "application/vnd.docker.distribution.manifest.v2+json",
 }
 PRIVATE_IDENTITY = b"l" + b"so"
-PRIVATE_IDENTITY_PATTERN = rb"(?i)(?:\b" + PRIVATE_IDENTITY + rb"\b|options-" + PRIVATE_IDENTITY + rb"|ken-" + PRIVATE_IDENTITY + rb"-wheel-dashboard|" + PRIVATE_IDENTITY + rb"-wheel-dashboard)"
-BROKER_MARKER_PATTERN = (
-    rb"(?i)(?:interactive\s*" + b"bro" + b"kers" + rb"|\b" + b"ib" + b"kr" + rb"\b|\b" + b"t" + b"ws" + rb"\b|\bDU[0-9]{5,}\b|account[_ -]?(?:id|number)\s*[:=]\s*[A-Za-z0-9-]{5,})"
+PRIVATE_IDENTITY_STRONG_PATTERN = rb"(?i)(?:options-" + PRIVATE_IDENTITY + rb"|ken-" + PRIVATE_IDENTITY + rb"-wheel-dashboard|" + PRIVATE_IDENTITY + rb"-wheel-dashboard)"
+PRIVATE_IDENTITY_TOKEN_PATTERN = rb"(?i)\b" + PRIVATE_IDENTITY + rb"\b"
+BROKER_STRONG_PATTERN = (
+    rb"(?i)(?:interactive\s*" + b"bro" + b"kers" + rb"|\b" + b"ib" + b"kr" + rb"\b|\bDU[0-9]{5,}\b|account[_ -]?(?:id|number)\s*[:=]\s*[A-Za-z0-9-]{5,})"
 )
+BROKER_TOKEN_PATTERN = rb"(?i)\b" + b"t" + b"ws" + rb"\b"
 PRIVATE_DEPLOYMENT_PATTERN = (
     rb"(?i)(?:/home/" + b"umb" + b"rel/|/opt/" + b"data/" + b"profiles/|" + b"tail" + b"scale" + rb"|100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3})"
 )
 POLICY_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
-    ("forbidden_identity", re.compile(PRIVATE_IDENTITY_PATTERN)),
-    ("broker_or_account_data", re.compile(BROKER_MARKER_PATTERN)),
+    ("forbidden_identity", re.compile(PRIVATE_IDENTITY_STRONG_PATTERN)),
+    ("forbidden_identity_token", re.compile(PRIVATE_IDENTITY_TOKEN_PATTERN)),
+    ("broker_or_account_data", re.compile(BROKER_STRONG_PATTERN)),
+    ("broker_token", re.compile(BROKER_TOKEN_PATTERN)),
     ("private_deployment", re.compile(PRIVATE_DEPLOYMENT_PATTERN)),
     ("proprietary_training", re.compile(rb"(?i)(?:proprietary[_ -]?(?:training|dataset)|private[_ -]?training[_ -]?data)")),
     ("credential_value", re.compile(rb"(?i)(?:password|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*['\"]?(?!\*+\b|x+\b|none\b|null\b|example\b|placeholder\b)[A-Za-z0-9_./+:-]{12,}")),
     ("order_capability", re.compile(rb"(?i)(?:place[_ -]?order|submit[_ -]?order|transmit[_ -]?order|/orders?(?:/|\b).{0,32}(?:post|put|patch|delete))")),
     ("write_route", re.compile(rb"(?i)(?:route\s*\([^\n]{0,160}methods\s*=\s*[^\n]{0,80}(?:post|put|patch|delete))")),
 )
-APPLICATION_POLICY_CATEGORIES = {"order_capability", "write_route"}
+APPLICATION_POLICY_CATEGORIES = {"order_capability", "write_route", "forbidden_identity_token", "broker_token"}
 DEPENDENCY_POLICY_CATEGORIES = {
     "forbidden_identity",
     "broker_or_account_data",
