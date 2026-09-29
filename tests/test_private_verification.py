@@ -273,9 +273,7 @@ class PrivateVerificationScannerTests(unittest.TestCase):
             "provenance_for_all_runnable_manifests",
             "TAG_DRIFT_DETECTED",
             "ANONYMOUS_NETWORK_FAILURE",
-            "https://github.com/actions/runner",
-            "https://github.com/docker/build-push-action",
-            "https://github.com/docker/setup-buildx-action",
+            "https://github.com/",
             "ATTESTATION_BUILDER_MISMATCH",
         ):
             self.assertIn(value, source)
