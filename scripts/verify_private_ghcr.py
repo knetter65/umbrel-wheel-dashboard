@@ -227,6 +227,17 @@ def scan_logs(payload: bytes) -> dict[str, Any]:
     return {"archive_files": files, "bytes_scanned": scanned, "policy_categories_matched": []}
 
 
+def repository_metadata(client: Client) -> dict[str, str]:
+    repository = safe_json(client.github(f"/repos/{REPOSITORY}").body, "REPOSITORY_JSON")
+    fail(
+        repository.get("full_name") != REPOSITORY
+        or repository.get("private") is not True
+        or repository.get("visibility") != "private",
+        "REPOSITORY_NOT_PRIVATE",
+    )
+    return {"full_name": REPOSITORY, "visibility": "private"}
+
+
 def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     run = safe_json(client.github(f"/repos/{REPOSITORY}/actions/runs/{run_id}").body, "RUN_JSON")
     fail(run.get("id") != run_id, "RUN_ID_MISMATCH")
@@ -235,8 +246,8 @@ def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str
     fail(run.get("head_branch") != "main", "RUN_BRANCH_MISMATCH")
     fail(run.get("head_sha") != sha, "RUN_SHA_MISMATCH")
     fail(run.get("conclusion") != "success" or run.get("status") != "completed", "RUN_NOT_SUCCESSFUL")
-    repository = run.get("repository") or {}
-    fail(repository.get("full_name") != REPOSITORY or repository.get("private") is not True or repository.get("visibility") != "private", "REPOSITORY_NOT_PRIVATE")
+    run_repository = run.get("repository") or {}
+    fail(run_repository.get("full_name") != REPOSITORY or run_repository.get("private") is not True, "RUN_REPOSITORY_MISMATCH")
     attempt = run.get("run_attempt")
     fail(not isinstance(attempt, int) or attempt < 1, "RUN_ATTEMPT_INVALID")
 
@@ -657,13 +668,14 @@ def main() -> int:
         run_id = int(run_id_text)
         fail(not re.fullmatch(r"[0-9a-f]{40}", sha), "COMMIT_SHA_INVALID")
         client = Client(os.environ.get("GITHUB_TOKEN", ""), os.environ.get("GITHUB_ACTOR", ""))
+        repository = repository_metadata(client)
         upstream, jobs, logs = github_run_and_jobs(client, run_id, sha)
         package = package_metadata(client)
         registry = registry_evidence(client, sha, Path(__file__).resolve().parents[1])
         evidence = {
             "schema": 1,
             "result": "PASS",
-            "repository": {"full_name": REPOSITORY, "visibility": "private"},
+            "repository": repository,
             "commit": sha,
             "upstream": upstream,
             "jobs": jobs,

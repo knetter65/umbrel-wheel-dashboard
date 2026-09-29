@@ -122,6 +122,29 @@ class PrivateVerificationScannerTests(unittest.TestCase):
             verify.verify_descriptor_payload(payload, {**descriptor, "size": len(payload) + 1}, "TEST")
         self.assertEqual(caught.exception.code, "TEST_SIZE")
 
+    def test_repository_visibility_uses_full_repository_metadata(self):
+        class RepositoryClient:
+            def __init__(self, metadata: dict[str, object]):
+                self.metadata = metadata
+
+            def github(self, path: str):
+                self.test_path = path
+                return verify.HTTPResult(200, {}, json.dumps(self.metadata).encode())
+
+        client = RepositoryClient(
+            {"full_name": verify.REPOSITORY, "private": True, "visibility": "private"}
+        )
+        self.assertEqual(
+            verify.repository_metadata(client),
+            {"full_name": verify.REPOSITORY, "visibility": "private"},
+        )
+        self.assertEqual(client.test_path, f"/repos/{verify.REPOSITORY}")
+
+        incomplete = RepositoryClient({"full_name": verify.REPOSITORY, "private": True})
+        with self.assertRaises(verify.VerificationError) as caught:
+            verify.repository_metadata(incomplete)
+        self.assertEqual(caught.exception.code, "REPOSITORY_NOT_PRIVATE")
+
     def test_layer_scan_counts_whiteouts_and_scans_deleted_history(self):
         first = self.make_layer([("app/deleted.txt", b"safe synthetic content")])
         overlay: dict[str, str] = {}
