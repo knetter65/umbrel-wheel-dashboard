@@ -49,6 +49,17 @@ class PrivateVerificationWorkflowTests(unittest.TestCase):
         self.assertNotIn("packages: write", self.workflow)
         self.assertNotIn("actions: write", self.workflow)
 
+    def test_runner_context_is_used_only_in_step_env(self):
+        runner_lines = [
+            line
+            for line in self.workflow.splitlines()
+            if "EVIDENCE_DIR:" in line and "runner.temp" in line
+        ]
+        self.assertEqual(
+            runner_lines,
+            ["          EVIDENCE_DIR: ${{ runner.temp }}/private-ghcr-evidence"] * 2,
+        )
+
     def test_evidence_branch_is_dedicated_and_non_force(self):
         self.assertIn("EVIDENCE_BRANCH: verification/private-0.3.0", self.workflow)
         self.assertIn('HEAD:refs/heads/$EVIDENCE_BRANCH', self.workflow)
