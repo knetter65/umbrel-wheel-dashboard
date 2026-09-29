@@ -19,7 +19,7 @@ jobs:
       - run: uv run python scripts/scan_publication.py .
   publish-private-ghcr:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'knetter65/wheel-dashboard'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'knetter65/umbrel-wheel-dashboard'
     runs-on: ubuntu-latest
     permissions:
       contents: read
