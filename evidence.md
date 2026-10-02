@@ -3,6 +3,6 @@
 - Result: **FAIL**
 - Failure code: `REPOSITORY_NOT_PRIVATE`
 - Repository: `knetter65/umbrel-wheel-dashboard`
-- Upstream run: `36614207689`
-- Commit: `6dce288e82864a8a4a592498cfa1114fc444ceb8`
+- Upstream run: `37048578211`
+- Commit: `e084293e9904612272b5893544bb195259ab7fcd`
 - Evidence is sanitized; no raw log or matched content is included.
