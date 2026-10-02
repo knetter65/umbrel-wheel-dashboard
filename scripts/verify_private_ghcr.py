@@ -22,14 +22,14 @@ REPOSITORY = "knetter65/umbrel-wheel-dashboard"
 OWNER = "knetter65"
 PACKAGE = "wheel-dashboard"
 IMAGE = f"ghcr.io/{OWNER}/{PACKAGE}"
-TAG = "0.3.0"
-EVIDENCE_BRANCH = "verification/private-0.3.0"
+TAG = "0.3.1"
+EVIDENCE_BRANCH = "verification/private-0.3.1"
 COMPOSE_PATH = "umbrel/wheel-dashboard/docker-compose.yml"
-PINNED_INDEX_DIGEST = "sha256:89b9ee1762d1498b42ec8b0afd680e89c016a4d80eeb2cdbf2a9ad627e0e016d"
-PINNED_REVISION = "7b8dbf7d8747e3c421638d5523d8feddad143c58"
+PINNED_INDEX_DIGEST = "sha256:cffc526544e8401fe812729ab255d15e98e93ca2ecb5035580218c545cff4b9e"
+PINNED_REVISION = "b994c44ecc286b6a743294a459bacd9f60d8eabb"
 PINNED_MANIFESTS = {
-    "linux/amd64": "sha256:5fbe255743f38d15a4bdaa52bdcec4202539d057f4c17cd26e628b8d6c97b178",
-    "linux/arm64": "sha256:e7d720bc88071890441f8b6bc2aa0755b09aaae727f332df12c04e4362b551c0",
+    "linux/amd64": "sha256:c7cf796496a732fb074021533cccbcf047de2af8d5c660e8b66e009520f81606",
+    "linux/arm64": "sha256:ff0d42a26f5aa4a98fbf3788c28849713a48723074df79006d9fd5558a301fe5",
 }
 EXPECTED_PLATFORMS = {("linux", "amd64"), ("linux", "arm64")}
 MAX_API_BYTES = 128 * 1024 * 1024

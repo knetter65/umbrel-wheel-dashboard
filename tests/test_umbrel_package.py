@@ -53,7 +53,7 @@ class UmbrelPackageTests(unittest.TestCase):
     def test_image_is_pinned_to_verified_distribution_digest(self):
         compose = (PACKAGE / "docker-compose.yml").read_text()
         self.assertIn(
-            "ghcr.io/knetter65/wheel-dashboard@sha256:89b9ee1762d1498b42ec8b0afd680e89c016a4d80eeb2cdbf2a9ad627e0e016d",
+            "ghcr.io/knetter65/wheel-dashboard@sha256:cffc526544e8401fe812729ab255d15e98e93ca2ecb5035580218c545cff4b9e",
             compose,
         )
 
