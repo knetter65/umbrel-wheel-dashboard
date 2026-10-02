@@ -16,7 +16,7 @@ STORE_PACKAGE_FILES = (
 class UmbrelPackageTests(unittest.TestCase):
     def test_identity_and_assets(self):
         manifest = (PACKAGE / "umbrel-app.yml").read_text()
-        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.0"', "port: 8050"):
+        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.1"', "port: 8050"):
             self.assertIn(value, manifest)
         for path in (PACKAGE / "icon.png", PACKAGE / "gallery" / "1.png"):
             self.assertTrue(path.is_file())

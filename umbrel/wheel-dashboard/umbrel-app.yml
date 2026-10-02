@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: finance
 name: Wheel Dashboard
-version: "0.3.0"
+version: "0.3.1"
 tagline: Private read-only Wheel strategy analysis
 description: >-
   A local and read-only dashboard for sanitized Wheel-strategy snapshots. It has
@@ -23,7 +23,7 @@ defaultUsername: ""
 defaultPassword: ""
 torOnly: false
 releaseNotes: >-
-  Initial generic package with authenticated Umbrel app-proxy ingress, read-only
-  external data, synthetic fixtures, health checking, and no broker write path.
+  Selects a newly promoted active database on every page load and safely maps
+  supported private producer labels to the generic public source contract.
 submitter: Wheel Dashboard contributors
 submission: ""

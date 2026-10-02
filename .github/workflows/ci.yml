@@ -79,4 +79,4 @@ jobs:
           provenance: mode=min
           build-args: |
             SOURCE_COMMIT=${{ github.sha }}
-          tags: ghcr.io/knetter65/wheel-dashboard:0.3.0
+          tags: ghcr.io/knetter65/wheel-dashboard:0.3.1

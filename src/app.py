@@ -64,15 +64,16 @@ def enrich_snapshot(raw: dict[str, Any]) -> dict[str, Any]:
     return snapshot
 
 
-DB_PATH = resolve_dashboard_database(DEFAULT_DB_PATH)
+DB_PATH = resolve_dashboard_database()
 
 
 def refresh_runtime_state() -> None:
     """Reload the atomically promoted database on each browser page load."""
-    global SNAPSHOT, IS_FIXTURE, IS_ACTIVE, SOURCE, ACCOUNT_SOURCE
+    global DB_PATH, SNAPSHOT, IS_FIXTURE, IS_ACTIVE, SOURCE, ACCOUNT_SOURCE
     global ACCOUNT_EFFECTIVE, PHASE_LABEL, SOURCE_SUMMARY, REFRESH_STATUS
     global HARDENING_STATUS, HARDENING_REPORT
     global SCHEDULER_CONFIG, SCHEDULE_STATUS
+    DB_PATH = resolve_dashboard_database()
     SNAPSHOT = enrich_snapshot(read_dashboard_snapshot(DB_PATH))
     IS_FIXTURE = all(source["kind"] == "FIXTURE" for source in SNAPSHOT["sources"])
     IS_ACTIVE = not IS_FIXTURE and Path(DB_PATH).resolve() == ACTIVE_DB_PATH.resolve()

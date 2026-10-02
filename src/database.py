@@ -26,10 +26,26 @@ ACTIVE_DB_PATH = DATA_ROOT / "active-readonly.db"
 _DB_OVERRIDE = os.environ.get("WHEEL_DASHBOARD_DB")
 _READ_ONLY_RUNTIME = os.environ.get("WHEEL_DASHBOARD_READ_ONLY", "").lower() in {"1", "true", "yes"}
 FIXTURE_DB_PATH = (ROOT / "fixtures" / "phase1-fixture.db") if _READ_ONLY_RUNTIME else (DATA_ROOT / "phase1-fixture.db")
-DEFAULT_DB_PATH = Path(
-    _DB_OVERRIDE
-    or (ACTIVE_DB_PATH if ACTIVE_DB_PATH.is_file() else FIXTURE_DB_PATH)
-)
+SOURCE_KIND_ALIASES = {
+    "IBKR_FLEX": "BROKER_HISTORY",
+    "IBKR_TWS": "BROKER_SNAPSHOT",
+}
+
+
+def canonical_source_kind(kind: str) -> str:
+    """Map private producer labels to the public dashboard contract."""
+    return SOURCE_KIND_ALIASES.get(str(kind), str(kind))
+
+
+def default_dashboard_database() -> Path:
+    """Resolve the current default without freezing pre-SEED fixture state."""
+    return Path(
+        _DB_OVERRIDE
+        or (ACTIVE_DB_PATH if ACTIVE_DB_PATH.is_file() else FIXTURE_DB_PATH)
+    )
+
+
+DEFAULT_DB_PATH = default_dashboard_database()
 MICRO = Decimal("1000000")
 SCHEMA_VERSION = "2"
 
@@ -104,7 +120,10 @@ def _validate_multisource_database(path: Path, label: str) -> Path:
     with database(path) as connection:
         integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
         foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
-        kinds = {row[0] for row in connection.execute("SELECT source_kind FROM source_snapshot")}
+        kinds = {
+            canonical_source_kind(row[0])
+            for row in connection.execute("SELECT source_kind FROM source_snapshot")
+        }
         hard_stops = connection.execute(
             "SELECT COUNT(*) FROM reconciliation_issue WHERE severity='HARD_STOP'"
         ).fetchone()[0]
@@ -121,9 +140,9 @@ def _validate_multisource_database(path: Path, label: str) -> Path:
     return path
 
 
-def resolve_dashboard_database(db_path: Path | str = DEFAULT_DB_PATH) -> Path:
+def resolve_dashboard_database(db_path: Path | str | None = None) -> Path:
     """Resolve fixture fallback, explicit staging override, or promoted active DB."""
-    path = Path(db_path)
+    path = Path(db_path) if db_path is not None else default_dashboard_database()
     if _DB_OVERRIDE:
         return _validate_multisource_database(path, "explicit staging")
     if path == ACTIVE_DB_PATH:
@@ -499,10 +518,11 @@ def read_dashboard_snapshot(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, 
             return row
 
         account_source = authority_snapshot(
-            "account_metric_snapshot", ("BROKER_SNAPSHOT", "FIXTURE", "BROKER_HISTORY")
+            "account_metric_snapshot",
+            ("BROKER_SNAPSHOT", "IBKR_TWS", "FIXTURE", "BROKER_HISTORY", "IBKR_FLEX"),
         )
         cycle_source = authority_snapshot(
-            "cycle_metric_snapshot", ("BROKER_HISTORY", "FIXTURE")
+            "cycle_metric_snapshot", ("BROKER_HISTORY", "IBKR_FLEX", "FIXTURE")
         )
         technical_source = authority_snapshot(
             "technical_snapshot", ("MARKET_HISTORY", "FIXTURE")
@@ -660,7 +680,7 @@ def read_dashboard_snapshot(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, 
             "generated_at": source["generated_at"],
             "sources": [
                 {
-                    "kind": item["source_kind"],
+                    "kind": canonical_source_kind(item["source_kind"]),
                     "quality": item["quality"],
                     "cutoff_at": item["cutoff_at"],
                     "content_sha256": item["content_sha256"],
