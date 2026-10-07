@@ -4,7 +4,17 @@ import json
 import unittest
 from decimal import Decimal
 
-from src.app import IS_ACTIVE, IS_FIXTURE, SNAPSHOT, build_technical_figure, create_app
+from plotly.utils import PlotlyJSONEncoder
+
+from src.app import (
+    IS_ACTIVE,
+    IS_FIXTURE,
+    SNAPSHOT,
+    assigned_put_strike,
+    build_recovery_panel,
+    build_technical_figure,
+    create_app,
+)
 from src.wheel_domain import CycleCashFlows
 
 
@@ -72,14 +82,38 @@ class DashboardSmokeTests(unittest.TestCase):
         self.assertEqual(Decimal(cycle["cashflow_break_even"]), flows.cashflow_break_even())
         self.assertEqual(Decimal(cycle["liquidation_break_even"]), flows.liquidation_break_even())
 
-    def test_chart_contains_candles_bollinger_rsi_and_cost_lines(self):
-        symbol = SNAPSHOT["technicals"][0]["underlying"]
+    def test_chart_contains_candles_bollinger_rsi_and_hoverable_recovery_lines(self):
+        cycle = next(c for c in SNAPSHOT["cycles"] if Decimal(c["remaining_shares"]) > 0)
+        symbol = cycle["underlying"]
         figure = build_technical_figure(symbol)
         names = {trace.name for trace in figure.data}
         self.assertTrue({symbol, "BB upper", "BB lower", "SMA20", "SMA50", "SMA200", "Volume", "RSI14"}.issubset(names))
         self.assertGreaterEqual(len(figure.data[0].x), 200)
-        annotations = {annotation.text for annotation in figure.layout.annotations}
-        self.assertIn("Originele strike", annotations)
+        references = {trace.meta["reference_level"] for trace in figure.data if trace.meta}
+        self.assertIn("Oorspronkelijke putstrike", references)
+        self.assertIn("Liquidation break-even", references)
+        self.assertFalse(any(annotation.text == "Originele strike" for annotation in figure.layout.annotations))
+
+    def test_recovery_panel_separates_assignment_and_break_even_meanings(self):
+        cycle = next(c for c in SNAPSHOT["cycles"] if Decimal(c["remaining_shares"]) > 0)
+        panel_text = json.dumps(
+            build_recovery_panel(cycle["underlying"]).to_plotly_json(),
+            ensure_ascii=False,
+            cls=PlotlyJSONEncoder,
+        )
+        for label in (
+            "Oorspronkelijke putstrike",
+            "Assignmentprijs",
+            "Brokerbasis",
+            "Locked break-even",
+            "Cashflow break-even",
+            "Liquidation break-even",
+            "Open callstrike",
+            "Resultaat bij call assignment",
+        ):
+            self.assertIn(label, panel_text)
+        assigned = [leg for leg in cycle["option_legs"] if leg["side"] == "PUT" and leg["state"] == "ASSIGNED"]
+        self.assertEqual(assigned_put_strike(cycle), assigned[-1]["strike"] if assigned else None)
 
     def test_source_badge_matches_selected_database(self):
         layout_text = json.dumps(

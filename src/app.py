@@ -41,6 +41,146 @@ def money(value: Any) -> str:
     return f"${Decimal(str(value)):,.2f}"
 
 
+def active_cycle_for_symbol(symbol: str) -> dict[str, Any] | None:
+    return next(
+        (
+            item
+            for item in SNAPSHOT["cycles"]
+            if item["underlying"] == symbol
+            and item["state"]
+            not in {"CLOSED_PUT_ONLY", "CLOSED_CALLED_AWAY", "CLOSED_STOCK_SOLD"}
+        ),
+        None,
+    )
+
+
+def assigned_put_strike(cycle: dict[str, Any]) -> Any:
+    """Return the terminal assigned put strike, never the broker basis."""
+    assigned = [
+        leg
+        for leg in cycle.get("option_legs", [])
+        if leg["side"] == "PUT" and leg["state"] == "ASSIGNED"
+    ]
+    return assigned[-1]["strike"] if assigned else None
+
+
+def cycle_cash_flows(cycle: dict[str, Any]) -> CycleCashFlows:
+    return CycleCashFlows(
+        remaining_shares=Decimal(cycle["remaining_shares"]),
+        stock_net_cashflow=Decimal(cycle["stock_net_cashflow"]),
+        closed_put_net_pnl=Decimal(cycle["realized_put_pnl"]),
+        closed_call_net_pnl=Decimal(cycle["realized_call_pnl"]),
+        open_option_cashflow=Decimal(cycle["open_option_cashflow"]),
+        dividends_net=Decimal(cycle["dividends_net"]),
+        open_option_close_cost=Decimal(cycle["open_option_close_cost"]),
+    )
+
+
+def recovery_level_data(symbol: str) -> dict[str, Any] | None:
+    cycle = active_cycle_for_symbol(symbol)
+    if cycle is None or Decimal(cycle["remaining_shares"]) <= 0:
+        return None
+
+    bars = read_market_bars(DB_PATH, symbol)
+    last_close = Decimal(str(bars[-1]["close"]))
+    liquidation = Decimal(str(cycle["liquidation_break_even"]))
+    gap = liquidation - last_close
+    gap_pct = (gap / last_close * Decimal("100")) if last_close else None
+
+    open_calls = [
+        leg
+        for leg in cycle.get("option_legs", [])
+        if leg["side"] == "CALL" and leg["state"] == "OPEN"
+    ]
+    call_strikes = sorted({Decimal(str(leg["strike"])) for leg in open_calls})
+    call_strike = call_strikes[0] if len(call_strikes) == 1 else None
+    covered_shares = sum(
+        Decimal(str(leg["contracts"])) * Decimal(str(leg.get("multiplier") or 100))
+        for leg in open_calls
+    )
+    remaining_shares = Decimal(str(cycle["remaining_shares"]))
+    call_assignment_pnl = None
+    if call_strike is not None and covered_shares == remaining_shares:
+        call_assignment_pnl = cycle_cash_flows(cycle).projected_call_assignment_pnl(
+            call_strike, remaining_shares
+        )
+
+    return {
+        "cycle": cycle,
+        "assignment_strike": assigned_put_strike(cycle),
+        "last_close": last_close,
+        "liquidation_gap": gap,
+        "liquidation_gap_pct": gap_pct,
+        "open_call_strike": call_strike,
+        "call_assignment_pnl": call_assignment_pnl,
+    }
+
+
+def recovery_level_card(label: str, value: str, subtitle: str, color: str) -> html.Div:
+    return html.Div(
+        [
+            html.Div(label, className="recovery-label"),
+            html.Div(value, className="recovery-value"),
+            html.Div(subtitle, className="recovery-subtitle"),
+        ],
+        className="recovery-card",
+        style={"borderLeftColor": color},
+    )
+
+
+def build_recovery_panel(symbol: str) -> html.Div:
+    data = recovery_level_data(symbol)
+    if data is None:
+        return html.Div(
+            "Geen toegewezen aandelen in een actieve Wheel-cyclus; herstelniveaus zijn niet van toepassing.",
+            className="explanation",
+        )
+
+    cycle = data["cycle"]
+    gap = data["liquidation_gap"]
+    gap_pct = data["liquidation_gap_pct"]
+    if gap <= 0:
+        gap_text = f"{money(data['last_close'])} slot ligt {money(abs(gap))} boven dit niveau"
+    else:
+        pct_text = f" ({gap_pct:.1f}%)" if gap_pct is not None else ""
+        gap_text = f"Nog {money(gap)}{pct_text} vanaf vertraagde slotkoers {money(data['last_close'])}"
+
+    assignment = data["assignment_strike"]
+    assignment_subtitle = (
+        "Strike van de put die tot de huidige aandelen leidde"
+        if assignment is not None
+        else "Geen assignment in de gereconcilieerde cyclus"
+    )
+    call_assignment = data["call_assignment_pnl"]
+    call_subtitle = (
+        "Volledige cyclus-P&L als alle huidige aandelen op de callstrike worden geleverd"
+        if call_assignment is not None
+        else "Alleen berekend bij één volledig dekkende callstrike"
+    )
+
+    cards = [
+        recovery_level_card("Oorspronkelijke putstrike", money(cycle.get("original_put_strike")), "Eerste putstrike van deze Wheel-cyclus", "#f97316"),
+        recovery_level_card("Assignmentprijs", money(assignment), assignment_subtitle, "#fb7185"),
+        recovery_level_card("Brokerbasis", money(cycle.get("broker_basis_per_share")), "Door broker gerapporteerde boekbasis; geen Wheel break-even", "#e2e8f0"),
+        recovery_level_card("Locked break-even", money(cycle.get("locked_break_even")), "No-lossniveau met alleen gerealiseerde optie-P&L", "#22c55e"),
+        recovery_level_card("Cashflow break-even", money(cycle.get("cashflow_break_even")), "Inclusief open optiecredit; conditioneel", "#38bdf8"),
+        recovery_level_card("Liquidation break-even", money(cycle.get("liquidation_break_even")), gap_text, "#e879f9"),
+        recovery_level_card("Open callstrike", money(data["open_call_strike"]), "Leveringsprijs bij assignment van de actieve covered call", "#facc15"),
+        recovery_level_card("Resultaat bij call assignment", money(call_assignment), call_subtitle, "#a78bfa"),
+    ]
+    return html.Div(
+        [
+            html.Div([html.H3("Herstelniveaus"), html.Span("read-only · geen orders", className="pill")], className="recovery-heading"),
+            html.Div(cards, className="recovery-grid"),
+            html.Div(
+                "Praktisch no-lossniveau: Liquidation break-even. Dit is de benodigde aandelenverkoopprijs om de volledige cyclus op $0 te sluiten na een conservatieve terugkoop van open opties. Cashflow break-even telt de open credit mee, maar is niet direct uitvoerbaar zolang die optie openstaat.",
+                className="explanation",
+            ),
+        ],
+        className="recovery-panel",
+    )
+
+
 def enrich_snapshot(raw: dict[str, Any]) -> dict[str, Any]:
     snapshot = deepcopy(raw)
     for cycle in snapshot["cycles"]:
@@ -229,6 +369,7 @@ def technical_layout() -> html.Div:
         [
             html.Div([html.Label("Selecteer aandeel"), dcc.Dropdown(id="symbol-select", options=symbols, value=symbols[0], clearable=False)], className="selector"),
             html.Div(warning, className="warning-inline"),
+            html.Div(build_recovery_panel(symbols[0]), id="recovery-levels"),
             dcc.Graph(id="technical-chart", config={"displaylogo": False, "responsive": True}),
         ],
         className="panel",
@@ -420,21 +561,36 @@ def build_technical_figure(symbol: str) -> go.Figure:
     fig.add_hline(y=70, line_dash="dot", line_color="#ef4444", row=3, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#22c55e", row=3, col=1)
 
-    cycle = next((item for item in SNAPSHOT["cycles"] if item["underlying"] == symbol and item["state"] not in {"CLOSED_PUT_ONLY", "CLOSED_CALLED_AWAY", "CLOSED_STOCK_SOLD"}), None)
+    cycle = active_cycle_for_symbol(symbol)
     if cycle:
         overlays = [
-            ("Originele strike", cycle.get("original_put_strike"), "#f97316"),
-            ("Brokerbasis", cycle.get("broker_basis_per_share"), "#e2e8f0"),
-            ("Locked BE", cycle.get("locked_break_even"), "#22c55e"),
-            ("Cashflow BE", cycle.get("cashflow_break_even") or cycle.get("cashflow_put_break_even"), "#38bdf8"),
-            ("Liquidation BE", cycle.get("liquidation_break_even"), "#e879f9"),
+            ("Oorspronkelijke putstrike", cycle.get("original_put_strike"), "#f97316", "dash"),
+            ("Assignmentprijs", assigned_put_strike(cycle), "#fb7185", "dot"),
+            ("Brokerbasis", cycle.get("broker_basis_per_share"), "#e2e8f0", "dash"),
+            ("Locked break-even", cycle.get("locked_break_even"), "#22c55e", "dot"),
+            ("Cashflow break-even", cycle.get("cashflow_break_even") or cycle.get("cashflow_put_break_even"), "#38bdf8", "dash"),
+            ("Liquidation break-even", cycle.get("liquidation_break_even"), "#e879f9", "longdash"),
         ]
         open_call = next((leg for leg in cycle.get("option_legs", []) if leg["side"] == "CALL" and leg["state"] == "OPEN"), None)
         if open_call:
-            overlays.append(("Open callstrike", open_call["strike"], "#facc15"))
-        for label, value, color in overlays:
+            overlays.append(("Open callstrike", open_call["strike"], "#facc15", "dashdot"))
+        for label, value, color, dash in overlays:
             if value is not None:
-                fig.add_hline(y=float(value), line_dash="dash", line_color=color, annotation_text=label, annotation_position="top left", row=1, col=1)
+                price = float(value)
+                fig.add_trace(
+                    go.Scatter(
+                        x=[dates[0], dates[-1]],
+                        y=[price, price],
+                        mode="lines",
+                        line={"color": color, "width": 1.8, "dash": dash},
+                        name=f"{label} · {money(value)}",
+                        hovertemplate=f"{label}: {money(value)}<extra></extra>",
+                        showlegend=False,
+                        meta={"reference_level": label, "price": str(value)},
+                    ),
+                    row=1,
+                    col=1,
+                )
 
     fig.update_layout(
         title=f"{symbol} · {SOURCE['kind']} ({SOURCE['quality']}) · cutoff {SOURCE['cutoff_at']}",
@@ -554,9 +710,13 @@ def create_app() -> Dash:
             ]
         )
 
-    @app.callback(Output("technical-chart", "figure"), Input("symbol-select", "value"))
+    @app.callback(
+        Output("technical-chart", "figure"),
+        Output("recovery-levels", "children"),
+        Input("symbol-select", "value"),
+    )
     def render_chart(symbol: str):
-        return build_technical_figure(symbol)
+        return build_technical_figure(symbol), build_recovery_panel(symbol)
 
     return app
 

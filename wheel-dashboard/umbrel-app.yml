@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: finance
 name: Wheel Dashboard
-version: "0.3.1"
+version: "0.3.2"
 tagline: Private read-only Wheel strategy analysis
 description: >-
   A local and read-only dashboard for sanitized Wheel-strategy snapshots. It has

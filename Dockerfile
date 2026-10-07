@@ -7,7 +7,7 @@ FROM ${PYTHON_IMAGE}
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.source="https://github.com/knetter65/umbrel-wheel-dashboard" \
       org.opencontainers.image.revision="${SOURCE_COMMIT}" \
-      org.opencontainers.image.version="0.3.1"
+      org.opencontainers.image.version="0.3.2"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
