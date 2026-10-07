@@ -294,11 +294,11 @@ def repository_metadata(client: Client) -> dict[str, str]:
     repository = safe_json(client.github(f"/repos/{REPOSITORY}").body, "REPOSITORY_JSON")
     fail(
         repository.get("full_name") != REPOSITORY
-        or repository.get("private") is not True
-        or repository.get("visibility") != "private",
-        "REPOSITORY_NOT_PRIVATE",
+        or repository.get("private") is not False
+        or repository.get("visibility") != "public",
+        "REPOSITORY_NOT_PUBLIC",
     )
-    return {"full_name": REPOSITORY, "visibility": "private"}
+    return {"full_name": REPOSITORY, "visibility": "public"}
 
 
 def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any], bool]:
@@ -360,7 +360,7 @@ def package_metadata(client: Client) -> dict[str, Any]:
         "PACKAGE_JSON",
     )
     fail(package.get("name") != PACKAGE or package.get("package_type") != "container", "PACKAGE_IDENTITY_MISMATCH")
-    fail(package.get("visibility") != "private", "PACKAGE_NOT_PRIVATE")
+    fail(package.get("visibility") != "public", "PACKAGE_NOT_PUBLIC")
     owner = package.get("owner") or {}
     fail(owner.get("login") not in {None, OWNER}, "PACKAGE_OWNER_MISMATCH")
     repository = package.get("repository") or {}
@@ -369,23 +369,48 @@ def package_metadata(client: Client) -> dict[str, Any]:
             repository.get("full_name") not in {None, REPOSITORY} or repository.get("name") not in {None, "umbrel-wheel-dashboard"},
             "PACKAGE_REPOSITORY_MISMATCH",
         )
-    return {"name": PACKAGE, "type": "container", "visibility": "private", "repository": REPOSITORY}
+    return {"name": PACKAGE, "type": "container", "visibility": "public", "repository": REPOSITORY}
 
 
-def anonymous_denial(index_digest: str) -> dict[str, Any]:
+def anonymous_public_read(index_digest: str) -> dict[str, Any]:
     url = f"https://ghcr.io/v2/{OWNER}/{PACKAGE}/manifests/{index_digest}"
-    request = urllib.request.Request(url, headers={"Accept": MANIFEST_ACCEPT, "User-Agent": "wheel-dashboard-private-verifier"})
+    user_agent = "wheel-dashboard-public-verifier"
+    request = urllib.request.Request(url, headers={"Accept": MANIFEST_ACCEPT, "User-Agent": user_agent})
+    body = b""
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
-            response.read(4096)
+            body = response.read(MAX_API_BYTES + 1)
             status = response.status
     except urllib.error.HTTPError as exc:
         exc.read(4096)
         status = exc.code
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise VerificationError("ANONYMOUS_NETWORK_FAILURE") from exc
-    fail(status not in {401, 403}, "ANONYMOUS_ARTIFACT_ACCESSIBLE")
-    return {"reference": index_digest, "result": "auth_denied", "http_status": status}
+    if status == 200:
+        fail(len(body) > MAX_API_BYTES or not digest_ok(body, index_digest), "ANONYMOUS_DIGEST_MISMATCH")
+        return {"reference": index_digest, "result": "public_pull", "challenge_status": 200, "http_status": 200}
+    fail(status != 401, "ANONYMOUS_CHALLENGE_MISMATCH")
+    token_url = "https://ghcr.io/token?" + urllib.parse.urlencode(
+        {"service": "ghcr.io", "scope": f"repository:{OWNER}/{PACKAGE}:pull"}
+    )
+    try:
+        with urllib.request.urlopen(urllib.request.Request(token_url, headers={"User-Agent": user_agent}), timeout=60) as response:
+            token_payload = safe_json(response.read(MAX_API_BYTES + 1), "ANONYMOUS_TOKEN_JSON")
+        token = token_payload.get("token")
+        fail(not isinstance(token, str) or not token, "ANONYMOUS_TOKEN_MISSING")
+        authorized = urllib.request.Request(
+            url,
+            headers={"Accept": MANIFEST_ACCEPT, "Authorization": f"Bearer {token}", "User-Agent": user_agent},
+        )
+        with urllib.request.urlopen(authorized, timeout=60) as response:
+            body = response.read(MAX_API_BYTES + 1)
+            final_status = response.status
+            final_digest = response.headers.get("Docker-Content-Digest")
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise VerificationError("ANONYMOUS_NETWORK_FAILURE") from exc
+    fail(final_status != 200 or final_digest != index_digest, "ANONYMOUS_PUBLIC_READ_FAILED")
+    fail(len(body) > MAX_API_BYTES or not digest_ok(body, index_digest), "ANONYMOUS_DIGEST_MISMATCH")
+    return {"reference": index_digest, "result": "public_pull", "challenge_status": status, "http_status": final_status}
 
 
 def controlled_files(root: Path) -> dict[str, str]:
@@ -699,7 +724,7 @@ def registry_evidence(client: Client, sha: str, root: Path, publication_succeede
     image_digests = {image["manifest_digest"] for image in images}
     fail({item["subject_digest"] for item in provenance} != image_digests, "PROVENANCE_COVERAGE_MISMATCH")
 
-    anonymous = anonymous_denial(index_digest)
+    anonymous = anonymous_public_read(index_digest)
     second = client.registry(reference, manifest=True)
     second_digest = second.headers.get("Docker-Content-Digest")
     fail(second_digest != index_digest or second.body != first.body, "TAG_DRIFT_DETECTED")
@@ -720,7 +745,7 @@ def registry_evidence(client: Client, sha: str, root: Path, publication_succeede
 def markdown(evidence: dict[str, Any]) -> str:
     if evidence["result"] != "PASS":
         lines = [
-            "# Private GHCR verification",
+            "# GHCR release verification",
             "",
             f"- Result: **FAIL**",
             f"- Failure code: `{evidence['failure_code']}`",
@@ -740,15 +765,15 @@ def markdown(evidence: dict[str, Any]) -> str:
         return "\n".join(lines)
     registry = evidence["registry"]
     lines = [
-        "# Private GHCR verification",
+        "# GHCR release verification",
         "",
         "- Result: **PASS**",
-        f"- Repository: `{REPOSITORY}` (PRIVATE)",
+        f"- Repository: `{REPOSITORY}` (PUBLIC)",
         f"- Upstream run: `{evidence['upstream']['id']}` attempt `{evidence['upstream']['attempt']}`",
         f"- Commit: `{evidence['commit']}`",
         f"- Artifact: `{registry['image']}`",
         f"- Index digest: `{registry['index_digest']}`",
-        "- Anonymous concrete-digest read: auth denied",
+        "- Anonymous concrete-digest pull: HTTP 200 after the standard registry challenge",
         "- Platforms: `linux/amd64`, `linux/arm64` (exact runnable set)",
         f"- Upstream logs scanned: `{evidence['logs']['archive_files']}` files / `{evidence['logs']['bytes_scanned']}` bytes",
         "- Every runnable manifest config and layer was digest-verified and scanned, including whiteouts and deleted-content history.",

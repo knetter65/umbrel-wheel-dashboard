@@ -136,18 +136,18 @@ class PrivateVerificationScannerTests(unittest.TestCase):
                 return verify.HTTPResult(200, {}, json.dumps(self.metadata).encode())
 
         client = RepositoryClient(
-            {"full_name": verify.REPOSITORY, "private": True, "visibility": "private"}
+            {"full_name": verify.REPOSITORY, "private": False, "visibility": "public"}
         )
         self.assertEqual(
             verify.repository_metadata(client),
-            {"full_name": verify.REPOSITORY, "visibility": "private"},
+            {"full_name": verify.REPOSITORY, "visibility": "public"},
         )
         self.assertEqual(client.test_path, f"/repos/{verify.REPOSITORY}")
 
-        incomplete = RepositoryClient({"full_name": verify.REPOSITORY, "private": True})
+        incomplete = RepositoryClient({"full_name": verify.REPOSITORY, "private": False})
         with self.assertRaises(verify.VerificationError) as caught:
             verify.repository_metadata(incomplete)
-        self.assertEqual(caught.exception.code, "REPOSITORY_NOT_PRIVATE")
+        self.assertEqual(caught.exception.code, "REPOSITORY_NOT_PUBLIC")
 
     def test_package_metadata_uses_repository_scoped_endpoint(self):
         class PackageClient:
@@ -160,14 +160,14 @@ class PrivateVerificationScannerTests(unittest.TestCase):
 
         encoded = urllib.parse.quote(verify.PACKAGE, safe="")
         client = PackageClient(
-            {"name": verify.PACKAGE, "package_type": "container", "visibility": "private"}
+            {"name": verify.PACKAGE, "package_type": "container", "visibility": "public"}
         )
         self.assertEqual(
             verify.package_metadata(client),
             {
                 "name": verify.PACKAGE,
                 "type": "container",
-                "visibility": "private",
+                "visibility": "public",
                 "repository": verify.REPOSITORY,
             },
         )
@@ -177,7 +177,7 @@ class PrivateVerificationScannerTests(unittest.TestCase):
             {
                 "name": verify.PACKAGE,
                 "package_type": "container",
-                "visibility": "private",
+                "visibility": "public",
                 "repository": {"full_name": "other/repo", "name": "repo"},
             }
         )
