@@ -25,11 +25,11 @@ IMAGE = f"ghcr.io/{OWNER}/{PACKAGE}"
 TAG = "0.3.2"
 EVIDENCE_BRANCH = "verification/private-0.3.2"
 COMPOSE_PATH = "umbrel/wheel-dashboard/docker-compose.yml"
-PINNED_INDEX_DIGEST = "sha256:cffc526544e8401fe812729ab255d15e98e93ca2ecb5035580218c545cff4b9e"
-PINNED_REVISION = "b994c44ecc286b6a743294a459bacd9f60d8eabb"
+PINNED_INDEX_DIGEST = "sha256:12e14f54e3ce7779363ef1dfaf0ba0d3a898e063b796e3674101da423305d230"
+PINNED_REVISION = "245f5974a22e001ce8462b09a1061d12e6decee4"
 PINNED_MANIFESTS = {
-    "linux/amd64": "sha256:c7cf796496a732fb074021533cccbcf047de2af8d5c660e8b66e009520f81606",
-    "linux/arm64": "sha256:ff0d42a26f5aa4a98fbf3788c28849713a48723074df79006d9fd5558a301fe5",
+    "linux/amd64": "sha256:f87fd1804ad9cafcea313670409a0ad1e208adb4d5da09b23e247b2022f13a2b",
+    "linux/arm64": "sha256:a0e1f60fbd6ec2ba1325f674ff80e2e9709b2578f55f0df10b175c0488deae34",
 }
 EXPECTED_PLATFORMS = {("linux", "amd64"), ("linux", "arm64")}
 MAX_API_BYTES = 128 * 1024 * 1024

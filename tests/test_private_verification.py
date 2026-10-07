@@ -62,7 +62,7 @@ class PrivateVerificationWorkflowTests(unittest.TestCase):
         )
 
     def test_evidence_branch_is_dedicated_and_non_force(self):
-        self.assertIn("EVIDENCE_BRANCH: verification/private-0.3.0", self.workflow)
+        self.assertIn("EVIDENCE_BRANCH: verification/private-0.3.2", self.workflow)
         self.assertIn('HEAD:refs/heads/$EVIDENCE_BRANCH', self.workflow)
         self.assertNotIn("--force", self.workflow)
         self.assertIn('"evidence.json evidence.md "', self.workflow)
