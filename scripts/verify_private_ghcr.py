@@ -310,7 +310,7 @@ def github_run_and_jobs(client: Client, run_id: int, sha: str) -> tuple[dict[str
     fail(run.get("head_sha") != sha, "RUN_SHA_MISMATCH")
     fail(run.get("conclusion") != "success" or run.get("status") != "completed", "RUN_NOT_SUCCESSFUL")
     run_repository = run.get("repository") or {}
-    fail(run_repository.get("full_name") != REPOSITORY or run_repository.get("private") is not True, "RUN_REPOSITORY_MISMATCH")
+    fail(run_repository.get("full_name") != REPOSITORY or run_repository.get("private") is not False, "RUN_REPOSITORY_MISMATCH")
     attempt = run.get("run_attempt")
     fail(not isinstance(attempt, int) or attempt < 1, "RUN_ATTEMPT_INVALID")
 
