@@ -16,10 +16,10 @@ STORE_PACKAGE_FILES = (
 class UmbrelPackageTests(unittest.TestCase):
     def test_identity_and_assets(self):
         manifest = (PACKAGE / "umbrel-app.yml").read_text()
-        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.2"', "port: 8050"):
+        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.3"', "port: 8050"):
             self.assertIn(value, manifest)
         dockerfile = (ROOT / "Dockerfile").read_text()
-        self.assertIn('org.opencontainers.image.version="0.3.2"', dockerfile)
+        self.assertIn('org.opencontainers.image.version="0.3.3"', dockerfile)
         for path in (PACKAGE / "icon.png", PACKAGE / "gallery" / "1.png"):
             self.assertTrue(path.is_file())
             self.assertGreater(path.stat().st_size, 1000)

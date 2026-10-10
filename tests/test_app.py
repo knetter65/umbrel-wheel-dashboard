@@ -14,6 +14,7 @@ from src.app import (
     build_recovery_panel,
     build_technical_figure,
     create_app,
+    position_type_label,
 )
 from src.wheel_domain import CycleCashFlows
 
@@ -81,6 +82,14 @@ class DashboardSmokeTests(unittest.TestCase):
         self.assertEqual(Decimal(cycle["locked_break_even"]), flows.locked_break_even())
         self.assertEqual(Decimal(cycle["cashflow_break_even"]), flows.cashflow_break_even())
         self.assertEqual(Decimal(cycle["liquidation_break_even"]), flows.liquidation_break_even())
+
+    def test_open_position_type_distinguishes_put_call_and_stock(self):
+        self.assertEqual(position_type_label({"asset_kind": "OPTION", "option_side": "PUT"}), "Put")
+        self.assertEqual(position_type_label({"asset_kind": "OPTION", "option_side": "CALL"}), "Call")
+        self.assertEqual(position_type_label({"asset_kind": "STOCK", "option_side": None}), "STOCK")
+        self.assertEqual(position_type_label({"asset_kind": "OPTION", "option_side": None}), "Optie (onbekend)")
+        fixture_types = {position_type_label(position) for position in SNAPSHOT["positions"]}
+        self.assertTrue({"Put", "Call"}.issubset(fixture_types))
 
     def test_chart_contains_candles_bollinger_rsi_and_hoverable_recovery_lines(self):
         cycle = next(c for c in SNAPSHOT["cycles"] if Decimal(c["remaining_shares"]) > 0)

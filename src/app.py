@@ -41,6 +41,18 @@ def money(value: Any) -> str:
     return f"${Decimal(str(value)):,.2f}"
 
 
+def position_type_label(position: dict[str, Any]) -> str:
+    asset_kind = str(position.get("asset_kind") or "").upper()
+    if asset_kind != "OPTION":
+        return asset_kind or "—"
+    option_side = str(position.get("option_side") or "").upper()
+    if option_side in {"P", "PUT"}:
+        return "Put"
+    if option_side in {"C", "CALL"}:
+        return "Call"
+    return "Optie (onbekend)"
+
+
 def active_cycle_for_symbol(symbol: str) -> dict[str, Any] | None:
     return next(
         (
@@ -305,7 +317,7 @@ def overview_layout() -> html.Div:
     for item in SNAPSHOT["positions"]:
         positions.append(
             {
-                "type": item["asset_kind"],
+                "type": position_type_label(item),
                 "symbool": item["underlying"],
                 "aantal": item["quantity"],
                 "marktprijs": money(item.get("market_price")),

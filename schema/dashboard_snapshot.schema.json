@@ -62,6 +62,7 @@
         "position_id": {"type": "string"},
         "cycle_id": {"type": ["string", "null"]},
         "asset_kind": {"enum": ["STOCK", "OPTION", "CASH"]},
+        "option_side": {"type": ["string", "null"], "enum": ["PUT", "CALL", null]},
         "underlying": {"type": "string", "pattern": "^[A-Z.]+$"},
         "occ_symbol": {"type": ["string", "null"]},
         "quantity": {"$ref": "#/$defs/decimal"},

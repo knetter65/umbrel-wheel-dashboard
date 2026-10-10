@@ -540,7 +540,7 @@ def read_dashboard_snapshot(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, 
         positions = []
         for row in connection.execute(
             """
-            SELECT p.*, u.symbol, l.occ_symbol
+            SELECT p.*, u.symbol, l.occ_symbol, l.side AS option_side
             FROM current_position p
             JOIN underlying u ON u.underlying_id=p.underlying_id
             LEFT JOIN option_leg l ON l.option_leg_id=p.option_leg_id
@@ -552,6 +552,7 @@ def read_dashboard_snapshot(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, 
                 "position_id": row["position_id"],
                 "cycle_id": row["cycle_id"],
                 "asset_kind": row["asset_kind"],
+                "option_side": row["option_side"],
                 "underlying": row["symbol"],
                 "occ_symbol": row["occ_symbol"],
                 "quantity": from_micros(row["quantity_micros"]),
