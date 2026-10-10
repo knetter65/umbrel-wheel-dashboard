@@ -1,5 +1,5 @@
-ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.6@sha256:f8d39a14d412e536c4e5c333d79ee1dce3ddbda4ed4bb5f7f21ae58c173a4ec2
-ARG PYTHON_IMAGE=python:3.13.5-slim@sha256:fd07246d45ebcfd139882601b71eea086ffa824ddd87999bceb4f36885c2f3ec
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.6@sha256:b1e699368d24c57cda93c338a57a8c5a119009ba809305cc8e86986d4a006754
+ARG PYTHON_IMAGE=python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419
 
 FROM ${UV_IMAGE} AS uv
 FROM ${PYTHON_IMAGE}
@@ -7,7 +7,7 @@ FROM ${PYTHON_IMAGE}
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.source="https://github.com/knetter65/umbrel-wheel-dashboard" \
       org.opencontainers.image.revision="${SOURCE_COMMIT}" \
-      org.opencontainers.image.version="0.3.3"
+      org.opencontainers.image.version="0.3.4"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

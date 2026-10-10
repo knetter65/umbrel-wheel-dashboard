@@ -16,10 +16,10 @@ STORE_PACKAGE_FILES = (
 class UmbrelPackageTests(unittest.TestCase):
     def test_identity_and_assets(self):
         manifest = (PACKAGE / "umbrel-app.yml").read_text()
-        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.3"', "port: 8050"):
+        for value in ("id: wheel-dashboard", "name: Wheel Dashboard", 'version: "0.3.4"', "port: 8050"):
             self.assertIn(value, manifest)
         dockerfile = (ROOT / "Dockerfile").read_text()
-        self.assertIn('org.opencontainers.image.version="0.3.3"', dockerfile)
+        self.assertIn('org.opencontainers.image.version="0.3.4"', dockerfile)
         for path in (PACKAGE / "icon.png", PACKAGE / "gallery" / "1.png"):
             self.assertTrue(path.is_file())
             self.assertGreater(path.stat().st_size, 1000)
@@ -65,6 +65,19 @@ class UmbrelPackageTests(unittest.TestCase):
         self.assertIn("USER 1000:1000", dockerfile)
         self.assertIn("WHEEL_DASHBOARD_READ_ONLY=1", dockerfile)
         self.assertGreaterEqual(dockerfile.count("@sha256:"), 2)
+
+    def test_base_images_use_multiarch_index_digests(self):
+        dockerfile = (ROOT / "Dockerfile").read_text()
+        self.assertIn(
+            "ghcr.io/astral-sh/uv:0.11.6@sha256:b1e699368d24c57cda93c338a57a8c5a119009ba809305cc8e86986d4a006754",
+            dockerfile,
+        )
+        self.assertIn(
+            "python:3.13.5-slim@sha256:4c2cf9917bd1cbacc5e9b07320025bdb7cdf2df7b0ceaccb55e9dd7e30987419",
+            dockerfile,
+        )
+        self.assertNotIn("sha256:f8d39a14d412e536c4e5c333d79ee1dce3ddbda4ed4bb5f7f21ae58c173a4ec2", dockerfile)
+        self.assertNotIn("sha256:fd07246d45ebcfd139882601b71eea086ffa824ddd87999bceb4f36885c2f3ec", dockerfile)
 
 if __name__ == "__main__":
     unittest.main()

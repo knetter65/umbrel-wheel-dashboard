@@ -22,8 +22,8 @@ REPOSITORY = "knetter65/umbrel-wheel-dashboard"
 OWNER = "knetter65"
 PACKAGE = "wheel-dashboard"
 IMAGE = f"ghcr.io/{OWNER}/{PACKAGE}"
-TAG = "0.3.3"
-EVIDENCE_BRANCH = "verification/private-0.3.3"
+TAG = "0.3.4"
+EVIDENCE_BRANCH = "verification/private-0.3.4"
 COMPOSE_PATH = "umbrel/wheel-dashboard/docker-compose.yml"
 PINNED_INDEX_DIGEST = "sha256:8b96a31350c8084cde82581613622f01b3ccb13a49bf5e80d284f31c89c21437"
 PINNED_REVISION = "c4c86c5700d37a4bb3dd622f130f68a030e1a899"
@@ -424,7 +424,24 @@ def controlled_files(root: Path) -> dict[str, str]:
     return expected
 
 
-def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_id: str | None = None) -> dict[str, Any]:
+def elf_architecture(header: bytes) -> str:
+    fail(len(header) < 20 or header[:4] != b"\x7fELF", "RUNTIME_PYTHON_NOT_ELF")
+    fail(header[4] != 2 or header[5] not in {1, 2}, "RUNTIME_PYTHON_ELF_FORMAT")
+    byteorder = "little" if header[5] == 1 else "big"
+    machine = int.from_bytes(header[18:20], byteorder=byteorder)
+    architecture = {62: "amd64", 183: "arm64"}.get(machine)
+    if architecture is None:
+        raise VerificationError("RUNTIME_PYTHON_ARCH_UNSUPPORTED")
+    return architecture
+
+
+def scan_layer(
+    data: bytes,
+    digest: str,
+    overlay: dict[str, str],
+    expected_diff_id: str | None = None,
+    elf_headers: dict[str, bytes] | None = None,
+) -> dict[str, Any]:
     fail(not digest_ok(data, digest), "LAYER_DIGEST_MISMATCH")
     try:
         uncompressed = gzip.decompress(data) if data.startswith(b"\x1f\x8b") else data
@@ -454,11 +471,17 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                     for existing in list(overlay):
                         if existing.startswith(prefix):
                             overlay.pop(existing)
+                    if elf_headers is not None:
+                        for existing in list(elf_headers):
+                            if existing.startswith(prefix):
+                                elf_headers.pop(existing)
                     continue
                 if name.startswith(".wh."):
                     whiteouts += 1
                     target = (path.parent / name[4:]).as_posix()
                     overlay.pop(target, None)
+                    if elf_headers is not None:
+                        elf_headers.pop(target, None)
                     continue
                 if member.isfile():
                     regular += 1
@@ -473,6 +496,11 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                         if existing.startswith(prefix):
                             overlay.pop(existing)
                     overlay[normalized] = sha256_bytes(payload)
+                    if elf_headers is not None:
+                        if normalized == "usr/local/bin/python3.13":
+                            elf_headers[normalized] = payload[:64]
+                        else:
+                            elf_headers.pop(normalized, None)
                 else:
                     non_regular += 1
                     if not member.isdir():
@@ -481,6 +509,8 @@ def scan_layer(data: bytes, digest: str, overlay: dict[str, str], expected_diff_
                             if existing.startswith(prefix):
                                 overlay.pop(existing)
                     overlay[normalized] = "nonregular:" + member.type.hex()
+                    if elf_headers is not None:
+                        elf_headers.pop(normalized, None)
     except (tarfile.TarError, OSError) as exc:
         raise VerificationError("LAYER_TAR_INVALID") from exc
     if findings:
@@ -576,6 +606,9 @@ def verify_image(
     platform = descriptor.get("platform") or {}
     pair = (platform.get("os"), platform.get("architecture"))
     fail(pair not in EXPECTED_PLATFORMS, "UNEXPECTED_RUNNABLE_PLATFORM")
+    expected_architecture = pair[1]
+    if not isinstance(expected_architecture, str):
+        raise VerificationError("UNEXPECTED_RUNNABLE_PLATFORM")
     manifest_data = client.registry(digest, manifest=True).body
     verify_descriptor_payload(manifest_data, descriptor, "MANIFEST")
     manifest = safe_json(manifest_data, "MANIFEST_JSON")
@@ -600,14 +633,17 @@ def verify_image(
     diff_ids = (config.get("rootfs") or {}).get("diff_ids")
     fail(not isinstance(diff_ids, list) or len(diff_ids) != len(layers), "ROOTFS_LAYER_COUNT_MISMATCH")
     overlay: dict[str, str] = {}
+    elf_headers: dict[str, bytes] = {}
     layer_evidence: list[dict[str, Any]] = []
     for index, layer in enumerate(layers):
         fail(not isinstance(layer, dict) or not isinstance(layer.get("digest"), str), "LAYER_DESCRIPTOR_INVALID")
         layer_data = client.registry(layer["digest"]).body
         verify_descriptor_payload(layer_data, layer, "LAYER")
-        layer_evidence.append(scan_layer(layer_data, layer["digest"], overlay, diff_ids[index]))
+        layer_evidence.append(scan_layer(layer_data, layer["digest"], overlay, diff_ids[index], elf_headers))
     actual = {path: overlay.get(path) for path in expected_files}
     fail(actual != expected_files, "CONTROLLED_SOURCE_MISMATCH")
+    python_architecture = elf_architecture(elf_headers.get("usr/local/bin/python3.13", b""))
+    fail(python_architecture != expected_architecture, "RUNTIME_PYTHON_ARCH_MISMATCH")
     return {
         "platform": {"os": pair[0], "architecture": pair[1]},
         "manifest_digest": digest,
@@ -619,7 +655,12 @@ def verify_image(
             "revision": labels["org.opencontainers.image.revision"],
             "version": labels["org.opencontainers.image.version"],
         },
-        "runtime": {"user": runtime["User"], "entrypoint": runtime.get("Entrypoint"), "cmd": runtime["Cmd"]},
+        "runtime": {
+            "user": runtime["User"],
+            "entrypoint": runtime.get("Entrypoint"),
+            "cmd": runtime["Cmd"],
+            "python_architecture": python_architecture,
+        },
     }
 
 

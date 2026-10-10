@@ -62,7 +62,7 @@ class PrivateVerificationWorkflowTests(unittest.TestCase):
         )
 
     def test_evidence_branch_is_dedicated_and_non_force(self):
-        self.assertIn("EVIDENCE_BRANCH: verification/private-0.3.3", self.workflow)
+        self.assertIn("EVIDENCE_BRANCH: verification/private-0.3.4", self.workflow)
         self.assertIn('HEAD:refs/heads/$EVIDENCE_BRANCH', self.workflow)
         self.assertNotIn("--force", self.workflow)
         self.assertIn('"evidence.json evidence.md "', self.workflow)
@@ -95,6 +95,25 @@ class PrivateVerificationScannerTests(unittest.TestCase):
                 info.size = len(payload)
                 archive.addfile(info, io.BytesIO(payload))
         return gzip.compress(raw.getvalue(), mtime=0)
+
+    def test_runtime_python_elf_architecture_is_derived_from_binary(self):
+        def header(machine: int) -> bytes:
+            value = bytearray(64)
+            value[:6] = b"\x7fELF\x02\x01"
+            value[18:20] = machine.to_bytes(2, "little")
+            return bytes(value)
+
+        self.assertEqual(verify.elf_architecture(header(62)), "amd64")
+        self.assertEqual(verify.elf_architecture(header(183)), "arm64")
+        with self.assertRaises(verify.VerificationError) as caught:
+            verify.elf_architecture(b"not-elf")
+        self.assertEqual(caught.exception.code, "RUNTIME_PYTHON_NOT_ELF")
+
+        layer = self.make_layer([("usr/local/bin/python3.13", header(62))])
+        digest = verify.sha256_bytes(layer)
+        elf_headers: dict[str, bytes] = {}
+        verify.scan_layer(layer, digest, {}, elf_headers=elf_headers)
+        self.assertEqual(verify.elf_architecture(elf_headers["usr/local/bin/python3.13"]), "amd64")
 
     def test_sanitized_scanner_returns_category_not_secret(self):
         secret = b"access_" + b"token" + b"=" + b"abcdefghijklmnop"
