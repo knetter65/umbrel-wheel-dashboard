@@ -2,13 +2,13 @@
 
 - Result: **PASS**
 - Repository: `knetter65/umbrel-wheel-dashboard` (PUBLIC)
-- Upstream run: `42022519767` attempt `1`
-- Commit: `ee5967f0209eed9c80baab0648157c0baca27863`
-- Artifact: `ghcr.io/knetter65/wheel-dashboard:0.3.5`
+- Upstream run: `42022885325` attempt `1`
+- Commit: `d4be9366815298e2e4d04bd2e3104c6396f6a640`
+- Artifact: `ghcr.io/knetter65/wheel-dashboard@sha256:4c62e43b498c27cda68eb6fb077738c632e85ae0e20904a4b69d4d1f521a0205`
 - Index digest: `sha256:4c62e43b498c27cda68eb6fb077738c632e85ae0e20904a4b69d4d1f521a0205`
 - Anonymous concrete-digest pull: HTTP 200 after the standard registry challenge
 - Platforms: `linux/amd64`, `linux/arm64` (exact runnable set)
-- Upstream logs scanned: `34` files / `340927` bytes
+- Upstream logs scanned: `20` files / `92499` bytes
 - Every runnable manifest config and layer was digest-verified and scanned, including whiteouts and deleted-content history.
 - Controlled application files, OCI revision/source/version labels, SLSA provenance subjects and upstream run metadata agree.
 
