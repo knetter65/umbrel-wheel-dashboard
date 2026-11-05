@@ -8,7 +8,7 @@ services:
 
   server:
     # Replace this pre-publication tag with the real GHCR distribution digest.
-    image: ghcr.io/knetter65/wheel-dashboard@sha256:c8f17000365beee2fc3616291fcb8093749988c34b7322de2b591248ec780eab
+    image: ghcr.io/knetter65/wheel-dashboard@sha256:4c62e43b498c27cda68eb6fb077738c632e85ae0e20904a4b69d4d1f521a0205
     user: "1000:1000"
     init: true
     restart: on-failure
