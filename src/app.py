@@ -88,6 +88,19 @@ def cycle_cash_flows(cycle: dict[str, Any]) -> CycleCashFlows:
     )
 
 
+def net_option_premium_cashflow(cycles: list[dict[str, Any]]) -> Decimal:
+    """Return all net option cashflow: credits minus debits, including rolls."""
+    return sum(
+        (
+            Decimal(str(cycle["realized_put_pnl"]))
+            + Decimal(str(cycle["realized_call_pnl"]))
+            + Decimal(str(cycle["open_option_cashflow"]))
+            for cycle in cycles
+        ),
+        Decimal("0"),
+    )
+
+
 def recovery_level_data(symbol: str) -> dict[str, Any] | None:
     cycle = active_cycle_for_symbol(symbol)
     if cycle is None or Decimal(cycle["remaining_shares"]) <= 0:
@@ -313,6 +326,7 @@ def data_table(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> da
 
 def overview_layout() -> html.Div:
     account = SNAPSHOT["account"]
+    net_option_premium = net_option_premium_cashflow(SNAPSHOT["cycles"])
     positions = []
     for item in SNAPSHOT["positions"]:
         positions.append(
@@ -351,8 +365,9 @@ def overview_layout() -> html.Div:
                     metric_card("Cash na assignments", money(account["cash_after_all_assignments"]), "Geen buying-powermaskering"),
                     metric_card("Gerealiseerde trading-P&L", money(account["realized_trading_pnl"]), "Exclusief externe inleg"),
                     metric_card("Open MTM", money(account["unrealized_trading_pnl"]), "Niet gerealiseerd"),
+                    metric_card("Netto optiepremie", money(net_option_premium), "Alle ontvangen minus betaalde optiepremie · inclusief rolls"),
                 ],
-                className="metric-grid",
+                className="metric-grid seven",
             ),
             html.Section([html.H2("Open posities"), data_table(positions, [("Type", "type"), ("Symbool", "symbool"), ("Aantal", "aantal"), ("Marktprijs", "marktprijs"), ("Marktwaarde", "marktwaarde"), ("Open P&L", "ongerealiseerd"), ("Cyclus", "cyclus")])], className="panel"),
             html.Section([html.H2("Wheel-cycli"), html.P("Een covered call blijft onderdeel van dezelfde economische cyclus.", className="section-note"), data_table(cycles, [("Cyclus", "cyclus"), ("Symbool", "symbool"), ("Status", "status"), ("Thesis", "thesis"), ("Put P&L", "put pnl"), ("Call P&L", "call pnl"), ("Locked BE", "locked BE"), ("Kwaliteit", "confidence")])], className="panel"),

@@ -14,6 +14,8 @@ from src.app import (
     build_recovery_panel,
     build_technical_figure,
     create_app,
+    money,
+    net_option_premium_cashflow,
     position_type_label,
 )
 from src.wheel_domain import CycleCashFlows
@@ -54,6 +56,8 @@ class DashboardSmokeTests(unittest.TestCase):
             "wheel-cycli",
             "p&l & cashflow",
             "gerealiseerde trading-p&l",
+            "netto optiepremie",
+            "alle ontvangen minus betaalde optiepremie · inclusief rolls",
             "open optiecashflow",
             "locked break-even",
             "techniek",
@@ -67,6 +71,15 @@ class DashboardSmokeTests(unittest.TestCase):
             self.assertIn(required, layout_text)
         for forbidden in ("place order", "submit order", "transmit order", "buy to open"):
             self.assertNotIn(forbidden, layout_text)
+
+    def test_net_option_premium_includes_closed_and_open_option_cashflow(self):
+        cycles = [
+            {"realized_put_pnl": "100", "realized_call_pnl": "25", "open_option_cashflow": "40"},
+            {"realized_put_pnl": "-30", "realized_call_pnl": "5", "open_option_cashflow": "-10"},
+        ]
+        self.assertEqual(net_option_premium_cashflow(cycles), Decimal("130"))
+        layout_text = json.dumps(self.client.get("/_dash-layout").get_json(), ensure_ascii=False)
+        self.assertIn(money(net_option_premium_cashflow(SNAPSHOT["cycles"])), layout_text)
 
     def test_assigned_metrics_are_recomputed_not_trusted_blindly(self):
         cycle = next(c for c in SNAPSHOT["cycles"] if Decimal(c["remaining_shares"]) > 0)
