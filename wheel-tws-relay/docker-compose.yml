@@ -1,0 +1,95 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: wheel-tws-relay_status_1
+      APP_PORT: 8080
+
+  relay:
+    image: python:3.13-alpine@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    init: true
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    network_mode: host
+    read_only: true
+    environment:
+      TWS_RELAY_CONNECT_TIMEOUT: "5"
+      TWS_RELAY_MAX_CONNECTIONS: "8"
+      TWS_RELAY_STATE_PATH: /state/relay-status.json
+      TWS_RELAY_HEALTH_SOCKET: /tmp/tws-relay-health.sock
+    volumes:
+      - type: bind
+        source: ${APP_DATA_DIR}/app
+        target: /app
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${APP_DATA_ROOT}
+        target: /state
+        read_only: false
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
+    entrypoint:
+      - python3
+      - /app/tws_relay.py
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import os,socket; p=os.environ['TWS_RELAY_HEALTH_SOCKET']; s=socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect(p); assert s.recv(3)==b'ok\\n'; s.close()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    container_name: wheel-tws-relay_relay_1
+
+  status:
+    image: python:3.13-alpine@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    init: true
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    environment:
+      STATUS_PORT: "8080"
+      TWS_RELAY_STATE_PATH: /state/relay-status.json
+    volumes:
+      - type: bind
+        source: ${APP_DATA_DIR}/app
+        target: /app
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${APP_DATA_ROOT}
+        target: /state
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
+    entrypoint:
+      - python3
+      - /app/status_server.py
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()==b'ok\\n'"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    container_name: wheel-tws-relay_status_1

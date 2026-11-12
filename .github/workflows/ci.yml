@@ -20,7 +20,18 @@ jobs:
           test_root="$(mktemp -d "${RUNNER_TEMP}/wheel-dashboard-tests.XXXXXX")"
           trap 'rm -rf -- "$test_root"' EXIT
           WHEEL_DASHBOARD_DATA_DIR="$test_root/data" uv run python -m unittest discover -s tests -v
-      - run: uv run python -m compileall -q src tests scripts
+      - name: Test standalone TWS relay package
+        run: uv run python -m unittest discover -s wheel-tws-relay/tests -v
+      - name: Validate standalone TWS relay compose
+        shell: bash
+        run: |
+          APP_DATA_DIR="$PWD/wheel-tws-relay" \
+          APP_DATA_ROOT="$PWD/wheel-tws-relay" \
+          docker compose \
+            -f wheel-tws-relay/docker-compose.yml \
+            -f wheel-tws-relay/tests/app-proxy-validation.yml \
+            config --quiet
+      - run: uv run python -m compileall -q src tests scripts wheel-tws-relay/app wheel-tws-relay/tests
       - run: uv run python scripts/scan_publication.py .
       - name: Verify tests left the release tree unchanged
         shell: bash

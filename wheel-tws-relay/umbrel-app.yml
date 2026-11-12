@@ -1,0 +1,30 @@
+manifestVersion: 1.1
+id: wheel-tws-relay
+storage:
+  dataRoot: data
+category: networking
+name: Private TWS Relay
+version: "0.1.0"
+tagline: Isolated private-network relay for read-only TWS access
+description: >-
+  A minimal, payload-blind TCP relay for private read-only TWS connectivity.
+  It runs independently of Hermes Agent, logs no broker payloads, exposes no
+  public port, and includes a small authenticated Umbrel status page.
+developer: Wheel Dashboard contributors
+website: ""
+dependencies: []
+repo: ""
+support: ""
+port: 17496
+icon: icon.png
+gallery: []
+releaseNotes: >-
+  Initial migration build. Separates the private TWS transport from the
+  vendor-managed Hermes Agent compose lifecycle.
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+deterministicPassword: false
+torOnly: false
+submitter: Ken
+submission: ""
