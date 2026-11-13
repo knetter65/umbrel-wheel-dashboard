@@ -1,0 +1,31 @@
+manifestVersion: 1.1
+id: wheel-hermes-desktop
+storage:
+  dataRoot: data
+category: networking
+name: Hermes Desktop Bridge
+version: "0.1.0"
+tagline: Private Tailscale backend for Hermes Desktop
+description: >-
+  A companion backend that runs hermes serve independently of the official
+  Hermes Agent compose. It binds only a private listen address supplied after
+  install, shares the Hermes home and isolated vault, and does not start a
+  second messaging gateway.
+developer: Wheel Dashboard contributors
+website: ""
+dependencies: []
+repo: ""
+support: ""
+port: 19120
+icon: icon.png
+gallery: []
+releaseNotes: >-
+  First companion package. Stage on a non-production listen port and keep the
+  Hermes-compose desktop_bridge until a real Desktop login plus WebSocket succeed.
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+deterministicPassword: false
+torOnly: false
+submitter: Ken
+submission: ""

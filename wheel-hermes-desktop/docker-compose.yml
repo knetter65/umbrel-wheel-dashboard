@@ -1,0 +1,84 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: wheel-hermes-desktop_status_1
+      APP_PORT: 8080
+
+  serve:
+    image: ghcr.io/getumbrel/hermes-agent-umbrel:v0.23.1@sha256:b7976dc05ed1348011c82bff15f04064eee53e307839337c9eec0b47af79b4f1
+    init: true
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    network_mode: host
+    environment:
+      HOME: /opt/data
+      HERMES_HOME: /opt/data
+      HERMES_DESKTOP_BOOTSTRAP_B64: "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJWYWxpZGF0ZSBwcml2YXRlIGxpc3RlbiBzZXR0aW5ncyBhbmQgZXhlYyBoZXJtZXMgc2VydmUgLS1za2lwLWJ1aWxkLiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgaXBhZGRyZXNzCmltcG9ydCBvcwppbXBvcnQgc3lzCgpIRVJNRVNfQklOID0gIi9vcHQvaGVybWVzLy52ZW52L2Jpbi9oZXJtZXMiCkhPU1RfRU5WID0gIkhFUk1FU19ERVNLVE9QX0xJU1RFTl9IT1NUIgpQT1JUX0VOViA9ICJIRVJNRVNfREVTS1RPUF9MSVNURU5fUE9SVCIKCgpkZWYgcmVxdWlyZWRfZW52KG5hbWU6IHN0cikgLT4gc3RyOgogICAgdmFsdWUgPSBvcy5lbnZpcm9uLmdldChuYW1lLCAiIikuc3RyaXAoKQogICAgaWYgbm90IHZhbHVlOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoZiJtaXNzaW5nIHJlcXVpcmVkIGVudmlyb25tZW50IHZhcmlhYmxlOiB7bmFtZX0iKQogICAgcmV0dXJuIHZhbHVlCgoKZGVmIHBhcnNlX3ByaXZhdGVfaXAobmFtZTogc3RyKSAtPiBzdHI6CiAgICB2YWx1ZSA9IHJlcXVpcmVkX2VudihuYW1lKQogICAgdHJ5OgogICAgICAgIGFkZHJlc3MgPSBpcGFkZHJlc3MuaXBfYWRkcmVzcyh2YWx1ZSkKICAgIGV4Y2VwdCBWYWx1ZUVycm9yIGFzIGV4YzoKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYie25hbWV9IG11c3QgYmUgYW4gSVAgYWRkcmVzcyIpIGZyb20gZXhjCiAgICBpZiBhZGRyZXNzLmlzX3Vuc3BlY2lmaWVkIG9yIGFkZHJlc3MuaXNfbXVsdGljYXN0OgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoZiJ7bmFtZX0gbWF5IG5vdCBiZSBhIHdpbGRjYXJkIG9yIG11bHRpY2FzdCBhZGRyZXNzIikKICAgIGlmIG5vdCAoYWRkcmVzcy5pc19wcml2YXRlIG9yIGFkZHJlc3MuaXNfbG9vcGJhY2sgb3IgYWRkcmVzcy5pc19saW5rX2xvY2FsKToKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYie25hbWV9IG11c3QgYmUgcHJpdmF0ZSwgbG9vcGJhY2ssIG9yIGxpbmstbG9jYWwiKQogICAgcmV0dXJuIHZhbHVlCgoKZGVmIHBhcnNlX3BvcnQobmFtZTogc3RyKSAtPiBzdHI6CiAgICByYXcgPSByZXF1aXJlZF9lbnYobmFtZSkKICAgIHRyeToKICAgICAgICBwb3J0ID0gaW50KHJhdykKICAgIGV4Y2VwdCBWYWx1ZUVycm9yIGFzIGV4YzoKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYie25hbWV9IG11c3QgYmUgYW4gaW50ZWdlciBwb3J0IikgZnJvbSBleGMKICAgIGlmIHBvcnQgPCAxIG9yIHBvcnQgPiA2NTUzNToKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYie25hbWV9IGlzIG91dCBvZiByYW5nZSIpCiAgICByZXR1cm4gc3RyKHBvcnQpCgoKZGVmIHNlcnZlX2FyZ3YoKSAtPiBsaXN0W3N0cl06CiAgICBob3N0ID0gcGFyc2VfcHJpdmF0ZV9pcChIT1NUX0VOVikKICAgIHBvcnQgPSBwYXJzZV9wb3J0KFBPUlRfRU5WKQogICAgcmV0dXJuIFtIRVJNRVNfQklOLCAic2VydmUiLCAiLS1ob3N0IiwgaG9zdCwgIi0tcG9ydCIsIHBvcnQsICItLXNraXAtYnVpbGQiXQoKCmRlZiBtYWluKCkgLT4gTm9uZToKICAgIGFyZ3YgPSBzZXJ2ZV9hcmd2KCkKICAgIGlmIG5vdCBvcy5wYXRoLmlzZmlsZShIRVJNRVNfQklOKToKICAgICAgICByYWlzZSBTeXN0ZW1FeGl0KCJoZXJtZXMgYmluYXJ5IG1pc3NpbmcgZnJvbSBpbWFnZSIpCiAgICBvcy5leGVjdihIRVJNRVNfQklOLCBhcmd2KQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICB0cnk6CiAgICAgICAgbWFpbigpCiAgICBleGNlcHQgVmFsdWVFcnJvciBhcyBleGM6CiAgICAgICAgcHJpbnQoc3RyKGV4YyksIGZpbGU9c3lzLnN0ZGVycikKICAgICAgICByYWlzZSBTeXN0ZW1FeGl0KDEpIGZyb20gZXhjCg=="
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
+    entrypoint:
+      - /opt/hermes/.venv/bin/python3
+      - -c
+      - "import base64,os; p='/tmp/serve_bootstrap.py'; open(p,'wb').write(base64.b64decode(os.environ.pop('HERMES_DESKTOP_BOOTSTRAP_B64'))); os.execv('/opt/hermes/.venv/bin/python3',['python3',p])"
+    volumes:
+      - type: bind
+        source: /home/umbrel/umbrel/app-data/hermes-agent/data/hermes
+        target: /opt/data
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /home/umbrel/umbrel/app-data/obsidian/data/config/Obsidian Vault/Hermes Vault
+        target: /obsidian/Obsidian Vault/Hermes Vault
+        read_only: false
+        bind:
+          create_host_path: false
+    healthcheck:
+      test:
+        - CMD
+        - /opt/hermes/.venv/bin/python3
+        - -c
+        - "import ipaddress,os,socket; h=os.environ['HERMES_DESKTOP_LISTEN_HOST']; p=int(os.environ['HERMES_DESKTOP_LISTEN_PORT']); a=ipaddress.ip_address(h); s=socket.socket(socket.AF_INET6 if a.version==6 else socket.AF_INET); s.settimeout(3); s.connect((h,p,0,0) if a.version==6 else (h,p)); s.close()"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    container_name: wheel-hermes-desktop_serve_1
+
+  status:
+    image: python:3.13-alpine@sha256:9ef1a599f863231c3d91e941389bfdc4a2d6070557243d54df1a4e57015b960e
+    init: true
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    environment:
+      STATUS_PORT: "8080"
+      HERMES_DESKTOP_STATUS_B64: "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJNaW5pbWFsIGF1dGhlbnRpY2F0ZWQgc3RhdHVzIFVJIGZvciB0aGUgSGVybWVzIERlc2t0b3AgY29tcGFuaW9uLiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgpmcm9tIGh0dHAgaW1wb3J0IEhUVFBTdGF0dXMKZnJvbSBodHRwLnNlcnZlciBpbXBvcnQgQmFzZUhUVFBSZXF1ZXN0SGFuZGxlciwgVGhyZWFkaW5nSFRUUFNlcnZlcgoKU1RBVFVTX1BPUlQgPSA4MDgwClBBR0UgPSAiIiI8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0iZW4iPgo8aGVhZD48bWV0YSBjaGFyc2V0PSJ1dGYtOCI+PHRpdGxlPkhlcm1lcyBEZXNrdG9wIGNvbXBhbmlvbjwvdGl0bGU+PC9oZWFkPgo8Ym9keT4KPGgxPkhlcm1lcyBEZXNrdG9wIGNvbXBhbmlvbjwvaDE+CjxwPlRoaXMgYXBwIHByb3ZpZGVzIGEgcHJpdmF0ZSA8Y29kZT5oZXJtZXMgc2VydmU8L2NvZGU+IGJhY2tlbmQuIENvbmZpZ3VyZSBsaXN0ZW4gaG9zdCBhbmQgcG9ydCBpbiBVbWJyZWwgYXBwIHNldHRpbmdzLiBEbyBub3QgZXhwb3NlIGEgcHVibGljIHBvcnQuPC9wPgo8cD5TdGF0dXM6IHBhY2thZ2UgaW5zdGFsbGVkLiBTZXJ2ZSBoZWFsdGggaXMgdGhlIGNvbnRhaW5lciBoZWFsdGhjaGVjayBhZnRlciBzZXR0aW5ncyBhcmUgYXBwbGllZC48L3A+CjwvYm9keT4KPC9odG1sPgoiIiIKCgpjbGFzcyBIYW5kbGVyKEJhc2VIVFRQUmVxdWVzdEhhbmRsZXIpOgogICAgc2VydmVyX3ZlcnNpb24gPSAiSGVybWVzRGVza3RvcFN0YXR1cy8xIgoKICAgIGRlZiBsb2dfbWVzc2FnZShzZWxmLCBfZm9ybWF0OiBzdHIsICpfYXJnczogb2JqZWN0KSAtPiBOb25lOgogICAgICAgIHJldHVybgoKICAgIGRlZiBzZW5kX2J5dGVzKHNlbGYsIHN0YXR1czogSFRUUFN0YXR1cywgY29udGVudF90eXBlOiBzdHIsIGJvZHk6IGJ5dGVzKSAtPiBOb25lOgogICAgICAgIHNlbGYuc2VuZF9yZXNwb25zZShzdGF0dXMpCiAgICAgICAgc2VsZi5zZW5kX2hlYWRlcigiQ29udGVudC1UeXBlIiwgY29udGVudF90eXBlKQogICAgICAgIHNlbGYuc2VuZF9oZWFkZXIoIkNvbnRlbnQtTGVuZ3RoIiwgc3RyKGxlbihib2R5KSkpCiAgICAgICAgc2VsZi5zZW5kX2hlYWRlcigiQ2FjaGUtQ29udHJvbCIsICJuby1zdG9yZSIpCiAgICAgICAgc2VsZi5lbmRfaGVhZGVycygpCiAgICAgICAgc2VsZi53ZmlsZS53cml0ZShib2R5KQoKICAgIGRlZiBkb19HRVQoc2VsZikgLT4gTm9uZToKICAgICAgICBpZiBzZWxmLnBhdGggaW4geyIvIiwgIi9pbmRleC5odG1sIn06CiAgICAgICAgICAgIHNlbGYuc2VuZF9ieXRlcyhIVFRQU3RhdHVzLk9LLCAidGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04IiwgUEFHRS5lbmNvZGUoInV0Zi04IikpCiAgICAgICAgICAgIHJldHVybgogICAgICAgIGlmIHNlbGYucGF0aCA9PSAiL2hlYWx0aHoiOgogICAgICAgICAgICBzZWxmLnNlbmRfYnl0ZXMoSFRUUFN0YXR1cy5PSywgInRleHQvcGxhaW47IGNoYXJzZXQ9dXRmLTgiLCBiIm9rXG4iKQogICAgICAgICAgICByZXR1cm4KICAgICAgICBzZWxmLnNlbmRfYnl0ZXMoSFRUUFN0YXR1cy5OT1RfRk9VTkQsICJ0ZXh0L3BsYWluOyBjaGFyc2V0PXV0Zi04IiwgYiJub3QgZm91bmRcbiIpCgoKZGVmIG1haW4oKSAtPiBOb25lOgogICAgVGhyZWFkaW5nSFRUUFNlcnZlcigoIjAuMC4wLjAiLCBTVEFUVVNfUE9SVCksIEhhbmRsZXIpLnNlcnZlX2ZvcmV2ZXIoKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBtYWluKCkK"
+    ports:
+      - 127.0.0.1:19121:8080
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
+    entrypoint:
+      - python3
+      - -c
+      - "import base64,os; p='/tmp/status_server.py'; open(p,'wb').write(base64.b64decode(os.environ.pop('HERMES_DESKTOP_STATUS_B64'))); os.execv('/usr/local/bin/python3',['python3',p])"
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()==b'ok\\n'"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    container_name: wheel-hermes-desktop_status_1

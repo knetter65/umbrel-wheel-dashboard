@@ -32,7 +32,19 @@ jobs:
             -f wheel-tws-relay/docker-compose.yml \
             -f wheel-tws-relay/tests/app-proxy-validation.yml \
             config --quiet
-      - run: uv run python -m compileall -q src tests scripts wheel-tws-relay/app wheel-tws-relay/tests
+      - name: Test standalone Hermes Desktop companion package
+        run: uv run python -m unittest discover -s wheel-hermes-desktop/tests -v
+      - name: Validate standalone Hermes Desktop companion compose
+        shell: bash
+        run: |
+          APP_SEED="ci-test-seed" \
+          APP_DATA_DIR="$PWD/wheel-hermes-desktop" \
+          APP_DATA_ROOT="$PWD/wheel-hermes-desktop" \
+          docker compose \
+            -f wheel-hermes-desktop/docker-compose.yml \
+            -f wheel-hermes-desktop/tests/app-proxy-validation.yml \
+            config --quiet
+      - run: uv run python -m compileall -q src tests scripts wheel-tws-relay/app wheel-tws-relay/tests wheel-hermes-desktop/app wheel-hermes-desktop/tests
       - run: uv run python scripts/scan_publication.py .
       - name: Verify tests left the release tree unchanged
         shell: bash
