@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-MODULE_PATH = Path(__file__).parents[1] / "app" / "tws_relay_v012.py"
+MODULE_PATH = Path(__file__).parents[1] / "app" / "tws_relay.py"
 SPEC = importlib.util.spec_from_file_location("tws_relay", MODULE_PATH)
 assert SPEC and SPEC.loader
 relay_module = importlib.util.module_from_spec(SPEC)

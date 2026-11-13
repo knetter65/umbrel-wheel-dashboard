@@ -18,19 +18,16 @@ services:
       TWS_RELAY_HEALTH_SOCKET: /tmp/tws-relay-health.sock
       TWS_RELAY_STATUS_URL: http://127.0.0.1:17497/internal/status
       TWS_RELAY_STATUS_TOKEN: ${APP_SEED}
-    volumes:
-      - type: bind
-        source: ${APP_DATA_DIR}/app
-        target: /app
-        read_only: true
-        bind:
-          create_host_path: false
+    configs:
+      - source: relay_runtime
+        target: /runtime/tws_relay.py
+        mode: 0444
 
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
     entrypoint:
       - python3
-      - /app/tws_relay_v012.py
+      - /runtime/tws_relay.py
     healthcheck:
       test:
         - CMD
@@ -58,19 +55,16 @@ services:
       TWS_RELAY_STATUS_TOKEN: ${APP_SEED}
     ports:
       - 127.0.0.1:17497:8080
-    volumes:
-      - type: bind
-        source: ${APP_DATA_DIR}/app
-        target: /app
-        read_only: true
-        bind:
-          create_host_path: false
+    configs:
+      - source: status_runtime
+        target: /runtime/status_server.py
+        mode: 0444
 
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
     entrypoint:
       - python3
-      - /app/status_server_v012.py
+      - /runtime/status_server.py
     healthcheck:
       test:
         - CMD
@@ -86,3 +80,356 @@ services:
     cap_drop:
       - ALL
     container_name: wheel-tws-relay_status_1
+
+configs:
+  relay_runtime:
+    content: |
+      #!/usr/bin/env python3
+      """Private, payload-blind TCP relay for a read-only TWS endpoint."""
+      from __future__ import annotations
+
+      import asyncio
+      import ipaddress
+      import json
+      import os
+      import signal
+      import urllib.error
+      import urllib.request
+      from contextlib import suppress
+      from datetime import datetime, timezone
+      from pathlib import Path
+
+      HEALTH_SOCKET = Path(os.environ.get("TWS_RELAY_HEALTH_SOCKET", "/tmp/tws-relay-health.sock"))
+      STATUS_URL = os.environ.get("TWS_RELAY_STATUS_URL", "http://127.0.0.1:17497/internal/status")
+
+
+      def utc_now() -> str:
+          return datetime.now(timezone.utc).isoformat()
+
+
+      def required_env(name: str) -> str:
+          value = os.environ.get(name, "").strip()
+          if not value:
+              raise ValueError(f"missing required environment variable: {name}")
+          return value
+
+
+      def parse_private_ip(name: str) -> str:
+          value = required_env(name)
+          try:
+              address = ipaddress.ip_address(value)
+          except ValueError as exc:
+              raise ValueError(f"{name} must be an IP address") from exc
+          if address.is_unspecified or address.is_multicast:
+              raise ValueError(f"{name} may not be a wildcard or multicast address")
+          if not (address.is_private or address.is_loopback or address.is_link_local):
+              raise ValueError(f"{name} must be private, loopback, or link-local")
+          return value
+
+
+      def parse_port(name: str) -> int:
+          raw = required_env(name)
+          try:
+              port = int(raw)
+          except ValueError as exc:
+              raise ValueError(f"{name} must be an integer") from exc
+          if not 1 <= port <= 65535:
+              raise ValueError(f"{name} must be between 1 and 65535")
+          return port
+
+
+      def parse_positive_int(name: str, default: int) -> int:
+          raw = os.environ.get(name, str(default))
+          try:
+              value = int(raw)
+          except ValueError as exc:
+              raise ValueError(f"{name} must be an integer") from exc
+          if value < 1:
+              raise ValueError(f"{name} must be positive")
+          return value
+
+
+      def load_config() -> dict[str, object]:
+          return {
+              "listen_host": parse_private_ip("TWS_RELAY_LISTEN_HOST"),
+              "listen_port": parse_port("TWS_RELAY_LISTEN_PORT"),
+              "remote_host": parse_private_ip("TWS_RELAY_REMOTE_HOST"),
+              "remote_port": parse_port("TWS_RELAY_REMOTE_PORT"),
+              "connect_timeout": float(os.environ.get("TWS_RELAY_CONNECT_TIMEOUT", "5")),
+              "max_connections": parse_positive_int("TWS_RELAY_MAX_CONNECTIONS", 8),
+          }
+
+
+      def _post_state(payload: dict[str, object]) -> None:
+          token = required_env("TWS_RELAY_STATUS_TOKEN")
+          body = json.dumps(payload, sort_keys=True).encode()
+          request = urllib.request.Request(
+              STATUS_URL,
+              data=body,
+              method="POST",
+              headers={"Content-Type": "application/json", "X-Relay-Token": token},
+          )
+          with urllib.request.urlopen(request, timeout=2) as response:
+              if response.status != 204:
+                  raise OSError("unexpected status response")
+
+
+      async def publish_state(payload: dict[str, object]) -> None:
+          try:
+              await asyncio.to_thread(_post_state, payload)
+          except (OSError, ValueError, urllib.error.URLError):
+              print(json.dumps({"event": "status_publish_failed"}), flush=True)
+
+
+      class Relay:
+          def __init__(self, config: dict[str, object]) -> None:
+              self.config = config
+              self.active_connections = 0
+              self.accepted_total = 0
+              self.rejected_total = 0
+              self.upstream_failures = 0
+              self._counter_lock = asyncio.Lock()
+
+          def state(self, status: str = "ready") -> dict[str, object]:
+              return {
+                  "status": status,
+                  "updated_at": utc_now(),
+                  "active_connections": self.active_connections,
+                  "accepted_total": self.accepted_total,
+                  "rejected_total": self.rejected_total,
+                  "upstream_failures": self.upstream_failures,
+                  "payload_logging": False,
+              }
+
+          async def publish(self, status: str = "ready") -> None:
+              await publish_state(self.state(status))
+
+          async def pipe(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+              try:
+                  while data := await reader.read(65536):
+                      writer.write(data)
+                      await writer.drain()
+              except (ConnectionError, asyncio.CancelledError):
+                  pass
+
+          async def handle(self, client_reader: asyncio.StreamReader, client_writer: asyncio.StreamWriter) -> None:
+              remote_writer: asyncio.StreamWriter | None = None
+              admitted = False
+              async with self._counter_lock:
+                  if self.active_connections >= int(self.config["max_connections"]):
+                      self.rejected_total += 1
+                  else:
+                      self.active_connections += 1
+                      self.accepted_total += 1
+                      admitted = True
+              await self.publish()
+              if not admitted:
+                  client_writer.close()
+                  await client_writer.wait_closed()
+                  return
+              try:
+                  remote_reader, remote_writer = await asyncio.wait_for(
+                      asyncio.open_connection(
+                          str(self.config["remote_host"]), int(self.config["remote_port"])
+                      ),
+                      timeout=float(self.config["connect_timeout"]),
+                  )
+                  forward = asyncio.create_task(self.pipe(client_reader, remote_writer))
+                  reverse = asyncio.create_task(self.pipe(remote_reader, client_writer))
+                  done, pending = await asyncio.wait(
+                      {forward, reverse}, return_when=asyncio.FIRST_COMPLETED
+                  )
+                  for task in pending:
+                      task.cancel()
+                  await asyncio.gather(*done, *pending, return_exceptions=True)
+              except (OSError, asyncio.TimeoutError):
+                  self.upstream_failures += 1
+                  print(json.dumps({"event": "upstream_connect_failed"}), flush=True)
+              finally:
+                  if remote_writer is not None:
+                      remote_writer.close()
+                      with suppress(ConnectionError):
+                          await remote_writer.wait_closed()
+                  client_writer.close()
+                  with suppress(ConnectionError):
+                      await client_writer.wait_closed()
+                  async with self._counter_lock:
+                      self.active_connections -= 1
+                  await self.publish()
+
+          async def heartbeat(self, stop: asyncio.Event) -> None:
+              while not stop.is_set():
+                  await self.publish()
+                  try:
+                      await asyncio.wait_for(stop.wait(), timeout=30)
+                  except asyncio.TimeoutError:
+                      pass
+
+
+      async def health_handler(
+          _reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+      ) -> None:
+          writer.write(b"ok\n")
+          await writer.drain()
+          writer.close()
+          await writer.wait_closed()
+
+
+      async def run() -> None:
+          try:
+              config = load_config()
+          except (ValueError, OverflowError) as exc:
+              await publish_state(
+                  {
+                      "status": "configuration_error",
+                      "updated_at": utc_now(),
+                      "error": str(exc),
+                      "payload_logging": False,
+                  }
+              )
+              raise
+
+          relay = Relay(config)
+          HEALTH_SOCKET.parent.mkdir(parents=True, exist_ok=True)
+          HEALTH_SOCKET.unlink(missing_ok=True)
+          health_server = await asyncio.start_unix_server(health_handler, path=str(HEALTH_SOCKET))
+          os.chmod(HEALTH_SOCKET, 0o600)
+          relay_server = await asyncio.start_server(
+              relay.handle,
+              str(config["listen_host"]),
+              int(config["listen_port"]),
+              backlog=16,
+          )
+
+          stop = asyncio.Event()
+          loop = asyncio.get_running_loop()
+          for sig in (signal.SIGTERM, signal.SIGINT):
+              loop.add_signal_handler(sig, stop.set)
+          heartbeat = asyncio.create_task(relay.heartbeat(stop))
+          print(json.dumps({"event": "relay_ready", "payload_logging": False}), flush=True)
+          try:
+              async with health_server, relay_server:
+                  await stop.wait()
+          finally:
+              heartbeat.cancel()
+              await asyncio.gather(heartbeat, return_exceptions=True)
+              await relay.publish("stopping")
+              HEALTH_SOCKET.unlink(missing_ok=True)
+
+
+      if __name__ == "__main__":
+          asyncio.run(run())
+  status_runtime:
+    content: |
+      #!/usr/bin/env python3
+      """Minimal authenticated status UI for the private TWS relay."""
+      from __future__ import annotations
+
+      import hmac
+      import html
+      import json
+      import os
+      import threading
+      from http import HTTPStatus
+      from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+      _ALLOWED_FIELDS = {
+          "status",
+          "updated_at",
+          "active_connections",
+          "accepted_total",
+          "rejected_total",
+          "upstream_failures",
+          "payload_logging",
+          "error",
+      }
+      _STATE: dict[str, object] = {"status": "waiting_for_relay"}
+      _STATE_LOCK = threading.Lock()
+
+
+      def load_state() -> dict[str, object]:
+          with _STATE_LOCK:
+              return dict(_STATE)
+
+
+      def store_state(payload: object) -> None:
+          if not isinstance(payload, dict):
+              raise ValueError("state is not an object")
+          unknown = set(payload) - _ALLOWED_FIELDS
+          if unknown:
+              raise ValueError("state contains unknown fields")
+          with _STATE_LOCK:
+              _STATE.clear()
+              _STATE.update(payload)
+
+
+      class Handler(BaseHTTPRequestHandler):
+          server_version = "TWSRelayStatus/2"
+
+          def log_message(self, _format: str, *_args: object) -> None:
+              return
+
+          def send_bytes(self, status: HTTPStatus, content_type: str, body: bytes) -> None:
+              self.send_response(status)
+              self.send_header("Content-Type", content_type)
+              self.send_header("Content-Length", str(len(body)))
+              self.send_header("Cache-Control", "no-store")
+              self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+              self.send_header("X-Content-Type-Options", "nosniff")
+              self.end_headers()
+              self.wfile.write(body)
+
+          def do_POST(self) -> None:  # noqa: N802
+              if self.path != "/internal/status":
+                  self.send_bytes(HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"not found\n")
+                  return
+              expected = os.environ.get("TWS_RELAY_STATUS_TOKEN", "")
+              supplied = self.headers.get("X-Relay-Token", "")
+              if not expected or not hmac.compare_digest(expected, supplied):
+                  self.send_bytes(HTTPStatus.FORBIDDEN, "text/plain; charset=utf-8", b"forbidden\n")
+                  return
+              try:
+                  size = int(self.headers.get("Content-Length", "0"))
+                  if not 1 <= size <= 16384:
+                      raise ValueError("invalid body size")
+                  payload = json.loads(self.rfile.read(size))
+                  store_state(payload)
+              except (ValueError, json.JSONDecodeError):
+                  self.send_bytes(HTTPStatus.BAD_REQUEST, "text/plain; charset=utf-8", b"bad request\n")
+                  return
+              self.send_bytes(HTTPStatus.NO_CONTENT, "text/plain; charset=utf-8", b"")
+
+          def do_GET(self) -> None:  # noqa: N802
+              state = load_state()
+              if self.path == "/healthz":
+                  self.send_bytes(HTTPStatus.OK, "text/plain; charset=utf-8", b"ok\n")
+                  return
+              if self.path == "/api/status":
+                  body = (json.dumps(state, sort_keys=True) + "\n").encode()
+                  self.send_bytes(HTTPStatus.OK, "application/json", body)
+                  return
+              if self.path not in {"/", "/index.html"}:
+                  self.send_bytes(HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"not found\n")
+                  return
+              rows = "".join(
+                  f"<dt>{html.escape(str(key))}</dt><dd>{html.escape(str(value))}</dd>"
+                  for key, value in sorted(state.items())
+              )
+              body = f"""<!doctype html>
+      <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+      <title>Private TWS Relay</title><style>
+      body{{font:16px system-ui;max-width:760px;margin:3rem auto;padding:0 1rem;background:#111;color:#eee}}
+      code,dd{{color:#9fe3b1}}dl{{display:grid;grid-template-columns:max-content 1fr;gap:.7rem 1rem}}
+      dt{{font-weight:700}}dd{{margin:0;overflow-wrap:anywhere}}.note{{color:#bbb}}
+      </style></head><body><h1>Private TWS Relay</h1>
+      <p class="note">Payload-blind, private-network relay. No broker payloads are logged.</p><dl>{rows}</dl></body></html>""".encode()
+              self.send_bytes(HTTPStatus.OK, "text/html; charset=utf-8", body)
+
+
+      def main() -> None:
+          port = int(os.environ.get("STATUS_PORT", "8080"))
+          ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
+
+      if __name__ == "__main__":
+          main()
