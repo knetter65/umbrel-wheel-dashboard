@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: networking
 name: Private TWS Relay
-version: "0.1.3"
+version: "0.1.4"
 tagline: Isolated private-network relay for read-only TWS access
 description: >-
   A minimal, payload-blind TCP relay for private read-only TWS connectivity.
@@ -19,9 +19,9 @@ port: 17496
 icon: icon.png
 gallery: []
 releaseNotes: >-
-  Ships the relay and status runtime as immutable Compose configs instead of
-  persistent app-data files, ensuring every Umbrel update runs the package's
-  exact tested code.
+  Ships the tested relay runtime as immutable encoded environment data decoded
+  only into tmpfs at startup. This preserves the read-only container filesystem
+  and works with umbrelOS legacy Compose handling.
 path: ""
 defaultUsername: ""
 defaultPassword: ""
