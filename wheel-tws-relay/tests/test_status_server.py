@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
-MODULE_PATH = Path(__file__).parents[1] / "app" / "status_server.py"
+MODULE_PATH = Path(__file__).parents[1] / "app" / "status_server_v012.py"
 SPEC = importlib.util.spec_from_file_location("status_server", MODULE_PATH)
 assert SPEC and SPEC.loader
 status_module = importlib.util.module_from_spec(SPEC)

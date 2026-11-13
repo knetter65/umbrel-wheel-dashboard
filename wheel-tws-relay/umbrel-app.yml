@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: networking
 name: Private TWS Relay
-version: "0.1.1"
+version: "0.1.2"
 tagline: Isolated private-network relay for read-only TWS access
 description: >-
   A minimal, payload-blind TCP relay for private read-only TWS connectivity.
@@ -19,8 +19,9 @@ port: 17496
 icon: icon.png
 gallery: []
 releaseNotes: >-
-  Moves transient relay status into an authenticated in-memory channel, avoiding
-  host-storage permission assumptions while keeping broker payloads out of logs.
+  Loads the authenticated in-memory status runtime from versioned application
+  files so an existing Umbrel data directory cannot retain the old state-file
+  implementation during an update.
 path: ""
 defaultUsername: ""
 defaultPassword: ""

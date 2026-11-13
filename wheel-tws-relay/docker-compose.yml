@@ -30,7 +30,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
     entrypoint:
       - python3
-      - /app/tws_relay.py
+      - /app/tws_relay_v012.py
     healthcheck:
       test:
         - CMD
@@ -70,7 +70,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700
     entrypoint:
       - python3
-      - /app/status_server.py
+      - /app/status_server_v012.py
     healthcheck:
       test:
         - CMD
