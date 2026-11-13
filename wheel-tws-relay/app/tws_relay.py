@@ -7,12 +7,14 @@ import ipaddress
 import json
 import os
 import signal
+import urllib.error
+import urllib.request
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
-STATE_PATH = Path(os.environ.get("TWS_RELAY_STATE_PATH", "/state/relay-status.json"))
 HEALTH_SOCKET = Path(os.environ.get("TWS_RELAY_HEALTH_SOCKET", "/tmp/tws-relay-health.sock"))
+STATUS_URL = os.environ.get("TWS_RELAY_STATUS_URL", "http://127.0.0.1:17497/internal/status")
 
 
 def utc_now() -> str:
@@ -72,13 +74,25 @@ def load_config() -> dict[str, object]:
     }
 
 
-def atomic_write_state(payload: dict[str, object]) -> None:
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    temporary = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    os.chmod(temporary, 0o600)
-    temporary.replace(STATE_PATH)
-    os.chmod(STATE_PATH, 0o600)
+def _post_state(payload: dict[str, object]) -> None:
+    token = required_env("TWS_RELAY_STATUS_TOKEN")
+    body = json.dumps(payload, sort_keys=True).encode()
+    request = urllib.request.Request(
+        STATUS_URL,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "X-Relay-Token": token},
+    )
+    with urllib.request.urlopen(request, timeout=2) as response:
+        if response.status != 204:
+            raise OSError("unexpected status response")
+
+
+async def publish_state(payload: dict[str, object]) -> None:
+    try:
+        await asyncio.to_thread(_post_state, payload)
+    except (OSError, ValueError, urllib.error.URLError):
+        print(json.dumps({"event": "status_publish_failed"}), flush=True)
 
 
 class Relay:
@@ -101,8 +115,8 @@ class Relay:
             "payload_logging": False,
         }
 
-    def publish(self, status: str = "ready") -> None:
-        atomic_write_state(self.state(status))
+    async def publish(self, status: str = "ready") -> None:
+        await publish_state(self.state(status))
 
     async def pipe(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
@@ -122,7 +136,7 @@ class Relay:
                 self.active_connections += 1
                 self.accepted_total += 1
                 admitted = True
-            self.publish()
+        await self.publish()
         if not admitted:
             client_writer.close()
             await client_writer.wait_closed()
@@ -155,7 +169,15 @@ class Relay:
                 await client_writer.wait_closed()
             async with self._counter_lock:
                 self.active_connections -= 1
-                self.publish()
+            await self.publish()
+
+    async def heartbeat(self, stop: asyncio.Event) -> None:
+        while not stop.is_set():
+            await self.publish()
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                pass
 
 
 async def health_handler(
@@ -171,7 +193,7 @@ async def run() -> None:
     try:
         config = load_config()
     except (ValueError, OverflowError) as exc:
-        atomic_write_state(
+        await publish_state(
             {
                 "status": "configuration_error",
                 "updated_at": utc_now(),
@@ -192,18 +214,20 @@ async def run() -> None:
         int(config["listen_port"]),
         backlog=16,
     )
-    relay.publish()
-    print(json.dumps({"event": "relay_ready", "payload_logging": False}), flush=True)
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
+    heartbeat = asyncio.create_task(relay.heartbeat(stop))
+    print(json.dumps({"event": "relay_ready", "payload_logging": False}), flush=True)
     try:
         async with health_server, relay_server:
             await stop.wait()
     finally:
-        relay.publish("stopping")
+        heartbeat.cancel()
+        await asyncio.gather(heartbeat, return_exceptions=True)
+        await relay.publish("stopping")
         HEALTH_SOCKET.unlink(missing_ok=True)
 
 

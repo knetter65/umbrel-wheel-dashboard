@@ -25,6 +25,7 @@ jobs:
       - name: Validate standalone TWS relay compose
         shell: bash
         run: |
+          APP_SEED="ci-test-seed" \
           APP_DATA_DIR="$PWD/wheel-tws-relay" \
           APP_DATA_ROOT="$PWD/wheel-tws-relay" \
           docker compose \

@@ -3,10 +3,9 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import os
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 MODULE_PATH = Path(__file__).parents[1] / "app" / "tws_relay.py"
 SPEC = importlib.util.spec_from_file_location("tws_relay", MODULE_PATH)
@@ -71,28 +70,25 @@ class RelayIntegrationTests(unittest.IsolatedAsyncioTestCase):
             "max_connections": 2,
         }
         relay = relay_module.Relay(config)
-        with tempfile.TemporaryDirectory() as directory:
-            original = relay_module.STATE_PATH
-            relay_module.STATE_PATH = Path(directory) / "status.json"
-            try:
-                server = await asyncio.start_server(relay.handle, "127.0.0.1", 0)
-                relay_port = server.sockets[0].getsockname()[1]
-                reader, writer = await asyncio.open_connection("127.0.0.1", relay_port)
-                writer.write(b"abc123")
-                await writer.drain()
-                self.assertEqual(await reader.read(1024), b"321cba")
-                writer.close()
-                await writer.wait_closed()
-                await asyncio.sleep(0.05)
-                self.assertEqual(relay.accepted_total, 1)
-                self.assertEqual(relay.upstream_failures, 0)
-                self.assertTrue(relay_module.STATE_PATH.exists())
-                server.close()
-                await server.wait_closed()
-            finally:
-                relay_module.STATE_PATH = original
-                upstream.close()
-                await upstream.wait_closed()
+        relay.publish = AsyncMock()
+        server = await asyncio.start_server(relay.handle, "127.0.0.1", 0)
+        try:
+            relay_port = server.sockets[0].getsockname()[1]
+            reader, writer = await asyncio.open_connection("127.0.0.1", relay_port)
+            writer.write(b"abc123")
+            await writer.drain()
+            self.assertEqual(await reader.read(1024), b"321cba")
+            writer.close()
+            await writer.wait_closed()
+            await asyncio.sleep(0.05)
+            self.assertEqual(relay.accepted_total, 1)
+            self.assertEqual(relay.upstream_failures, 0)
+            self.assertGreaterEqual(relay.publish.await_count, 2)
+        finally:
+            server.close()
+            await server.wait_closed()
+            upstream.close()
+            await upstream.wait_closed()
 
 
 if __name__ == "__main__":
