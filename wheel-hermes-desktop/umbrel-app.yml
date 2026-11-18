@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: networking
 name: Hermes Desktop Bridge
-version: "0.1.0"
+version: "0.1.1"
 tagline: Private Tailscale backend for Hermes Desktop
 description: >-
   A companion backend that runs hermes serve independently of the official
@@ -20,8 +20,9 @@ port: 19120
 icon: icon.png
 gallery: []
 releaseNotes: >-
-  First companion package. Stage on a non-production listen port and keep the
-  Hermes-compose desktop_bridge until a real Desktop login plus WebSocket succeed.
+  Updates the companion runtime to the official Hermes Agent 0.23.2 Umbrel
+  image. Private listener settings, the permanent port, and narrow mounts are
+  unchanged.
 path: ""
 defaultUsername: ""
 defaultPassword: ""
