@@ -4,7 +4,7 @@ storage:
   dataRoot: data
 category: networking
 name: Hermes Desktop Bridge
-version: "0.1.2"
+version: "0.1.3"
 tagline: Private Tailscale backend for Hermes Desktop
 description: >-
   A companion backend that runs hermes serve independently of the official
@@ -20,10 +20,9 @@ port: 19120
 icon: icon.png
 gallery: []
 releaseNotes: >-
-  Removes the hardcoded cross-app Obsidian bind. The companion now requires
-  the isolated Hermes Vault through an umbrelOS-managed custom mount and
-  fails closed when that exact mount is absent. The official Hermes Agent
-  0.23.2 image and private listener settings are unchanged.
+  Updates the companion runtime to the official Hermes Agent 0.23.3 Umbrel
+  image. Private listener settings, the permanent port, and narrow mounts are
+  unchanged.
 path: ""
 defaultUsername: ""
 defaultPassword: ""
