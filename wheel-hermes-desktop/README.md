@@ -14,7 +14,8 @@ This is not a TCP relay. It must use the current official Hermes image and share
 - Rejects wildcard, multicast, and public listeners.
 - Starts `hermes serve --skip-build` only; it does not start `hermes gateway run`.
 - Runs as UID/GID 1000 with all Linux capabilities dropped.
-- Mounts only the Hermes home and the isolated Hermes Vault; the parent Obsidian vault stays unmounted.
+- Mounts the Hermes home directly. The isolated Hermes Vault must be supplied separately through an umbrelOS-managed custom mount; the parent Obsidian vault stays unmounted.
+- Refuses to start `hermes serve` when the exact isolated vault mount is absent or inaccessible.
 - Listen host and port are injected through umbrelOS app settings after install. They are not committed to Git.
 
 ## Required service environment
@@ -23,6 +24,11 @@ Set these on the `serve` service through umbrelOS app settings:
 
 - `HERMES_DESKTOP_LISTEN_HOST`
 - `HERMES_DESKTOP_LISTEN_PORT`
+
+Configure one read-write custom mount on `serve` as well. Select the dedicated
+`/Home` subdirectory containing the Hermes Vault and use the container target
+`/obsidian/Obsidian Vault/Hermes Vault`. Do not grant the companion access to
+all of `/Home` or to the parent Obsidian vault.
 
 ## Staging
 

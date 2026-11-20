@@ -14,7 +14,7 @@ MANIFEST = (ROOT / "umbrel-app.yml").read_text()
 class PackageContractTests(unittest.TestCase):
     def test_app_id_and_version(self) -> None:
         self.assertIn("\nid: wheel-hermes-desktop\n", MANIFEST)
-        self.assertIn('version: "0.1.1"', MANIFEST)
+        self.assertIn('version: "0.1.2"', MANIFEST)
 
     def test_serve_uses_pinned_hermes_image(self) -> None:
         self.assertIn(
@@ -29,9 +29,9 @@ class PackageContractTests(unittest.TestCase):
         self.assertIn('user: "1000:1000"', COMPOSE)
         self.assertIn("create_host_path: false", COMPOSE)
 
-    def test_narrow_vault_mount_only(self) -> None:
-        self.assertIn("/obsidian/Obsidian Vault/Hermes Vault", COMPOSE)
-        self.assertNotIn("target: /obsidian/Obsidian Vault\n", COMPOSE)
+    def test_vault_is_not_a_hardcoded_cross_app_bind(self) -> None:
+        self.assertNotIn("/home/umbrel/umbrel/app-data/obsidian", COMPOSE)
+        self.assertNotIn("target: /obsidian/Obsidian Vault/Hermes Vault", COMPOSE)
         self.assertIn("/home/umbrel/umbrel/app-data/hermes-agent/data/hermes", COMPOSE)
 
     def test_encoded_bootstrap_matches_source(self) -> None:
@@ -41,6 +41,8 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(decoded, (ROOT / "app" / "serve_bootstrap.py").read_bytes())
         self.assertIn(b"serve", decoded)
         self.assertNotIn(b"gateway run", decoded)
+        self.assertIn(b"/obsidian/Obsidian Vault/Hermes Vault", decoded)
+        self.assertIn(b"/proc/self/mountinfo", decoded)
 
     def test_encoded_status_matches_source(self) -> None:
         match = re.search(r'HERMES_DESKTOP_STATUS_B64: "([^"]+)"', COMPOSE)

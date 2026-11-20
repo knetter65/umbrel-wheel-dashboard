@@ -9,7 +9,7 @@ This record omits private network addresses, device identifiers, credentials, an
 - Runtime image: the official Hermes Umbrel image then in use.
 - Process: `hermes serve --skip-build` only; no messaging gateway.
 - Network mode: host, private listen address injected at runtime.
-- Data: shared Hermes home plus isolated Hermes Vault. Parent Obsidian vault stays unmounted.
+- Data: shared Hermes home plus an isolated Hermes Vault supplied through an umbrelOS-managed custom mount. Parent Obsidian vault stays unmounted.
 
 ## Why a companion app
 
@@ -21,6 +21,7 @@ Hermes app updates replace the vendor compose. A Desktop backend injected there 
 - Pinned official Hermes image digest, bumped after each official Hermes update.
 - Entrypoint bypasses s6 and execs `hermes serve --skip-build`.
 - Listen host and port supplied only as local Umbrel app settings.
+- Vault source supplied only as a narrow local umbrelOS custom mount targeting `/obsidian/Obsidian Vault/Hermes Vault`; the package contains no Obsidian app-data source path.
 - Status page on the default Docker network for `app_proxy`.
 - Existing `hermes-desktop-bridge` remains production until Desktop login plus WebSocket succeed on a staging port.
 
@@ -31,6 +32,7 @@ Hermes app updates replace the vendor compose. A Desktop backend injected there 
 - [ ] Container health is healthy and serve-only.
 - [ ] Local `/api/status` succeeds on the staging port.
 - [ ] Managed restart preserves settings.
+- [ ] `hermes serve` fails closed without the exact managed vault mount and starts with it.
 - [ ] Hermes Desktop completes login plus WebSocket from the Mac.
 - [ ] Production listen port is moved only after those gates.
 - [ ] Hermes compose no longer contains `desktop_bridge`.

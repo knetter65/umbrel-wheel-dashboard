@@ -75,13 +75,42 @@ class ExecTests(unittest.TestCase):
         }
         with patch.dict(os.environ, values, clear=True):
             with patch.object(bootstrap.os.path, "isfile", return_value=True):
-                with patch.object(bootstrap.os, "execv") as execv:
-                    bootstrap.main()
+                with patch.object(bootstrap, "validate_vault_mount") as validate_mount:
+                    with patch.object(bootstrap.os, "execv") as execv:
+                        bootstrap.main()
+        validate_mount.assert_called_once_with()
         execv.assert_called_once()
         argv = execv.call_args.args[1]
         self.assertEqual(argv[1], "serve")
         self.assertEqual(argv[-1], "--skip-build")
         self.assertNotIn("gateway", " ".join(argv))
+
+
+class VaultMountTests(unittest.TestCase):
+    def test_mountinfo_space_escape_is_decoded(self) -> None:
+        self.assertEqual(
+            bootstrap._unescape_mountinfo_path("/obsidian/Obsidian\\040Vault/Hermes\\040Vault"),
+            bootstrap.VAULT_TARGET,
+        )
+
+    def test_exact_managed_mount_is_accepted(self) -> None:
+        with patch.object(bootstrap.Path, "is_dir", return_value=True):
+            with patch.object(bootstrap, "exact_mount_targets", return_value={bootstrap.VAULT_TARGET}):
+                with patch.object(bootstrap.os, "access", return_value=True):
+                    bootstrap.validate_vault_mount()
+
+    def test_missing_exact_mount_is_rejected(self) -> None:
+        with patch.object(bootstrap.Path, "is_dir", return_value=True):
+            with patch.object(bootstrap, "exact_mount_targets", return_value={"/opt/data"}):
+                with self.assertRaisesRegex(ValueError, "not an exact managed mount"):
+                    bootstrap.validate_vault_mount()
+
+    def test_read_only_mount_is_rejected(self) -> None:
+        with patch.object(bootstrap.Path, "is_dir", return_value=True):
+            with patch.object(bootstrap, "exact_mount_targets", return_value={bootstrap.VAULT_TARGET}):
+                with patch.object(bootstrap.os, "access", return_value=False):
+                    with self.assertRaisesRegex(ValueError, "not read-write"):
+                        bootstrap.validate_vault_mount()
 
 
 if __name__ == "__main__":
