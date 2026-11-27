@@ -14,11 +14,11 @@ MANIFEST = (ROOT / "umbrel-app.yml").read_text()
 class PackageContractTests(unittest.TestCase):
     def test_app_id_and_version(self) -> None:
         self.assertIn("\nid: wheel-hermes-desktop\n", MANIFEST)
-        self.assertIn('version: "0.1.3"', MANIFEST)
+        self.assertIn('version: "0.1.4"', MANIFEST)
 
     def test_serve_uses_pinned_hermes_image(self) -> None:
         self.assertIn(
-            "ghcr.io/getumbrel/hermes-agent-umbrel:v0.23.3@sha256:7389affe7e1f7b9d35453f9b3c7804eb88fd417ae543682402f5aa8d21a778ad",
+            "ghcr.io/getumbrel/hermes-agent-umbrel:v0.23.4@sha256:17a01ade6e52b35cd5291d058afe3c24e3346a03bba11240ffe63e58e561fec9",
             COMPOSE,
         )
 
